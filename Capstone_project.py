@@ -31,6 +31,7 @@ sessions = {}          # Stores scheduled study sessions
 courses = {}           # Stores course names and colors
 course_colors = {}     # Stores color for each course
 tracked_hours = {}     # Stores accumulated Pomodoro study time per course
+flashcards_by_course = {}
 
 # --- DEFAULT COURSES AT STARTUP ---
 default_courses = ["Math", "History", "Biology"]
@@ -876,11 +877,276 @@ def course_tracker():
 # -----------------------------------------
 #  FUNCTION: Flashcards & Quizzes
 # -----------------------------------------
-def flashcards():
-    messagebox.showinfo("Flashcards", "Flashcards feature will be added soon.", parent=root_window)
+def manage_flashcards():
+    flash_window = Toplevel(root_window)
+    flash_window.title("Manage Flashcards")
+    flash_window.geometry("500x400")
 
-def quizzes():
-    messagebox.showinfo("Quizzes", "Quizzes feature will be added soon.", parent=root_window)
+    Label(flash_window, text="Manage Flashcards", font=("Arial",12,"bold")).pack(pady=5)
+
+    list_frame = Frame(flash_window)
+    list_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+    listbox = Listbox(list_frame)
+    listbox.pack(side="left", fill="both", expand=True)
+    scrollbar = Scrollbar(list_frame, orient="vertical")
+    scrollbar.pack(side="right", fill="y")
+    listbox.config(yscrollcommand=scrollbar.set)
+    scrollbar.config(command=listbox.yview)
+
+    course = None
+
+    def choose_course():
+        popup = Toplevel(flash_window)
+        popup.title("Choose Course")
+        popup.geometry("400x300")
+        popup.transient(flash_window)
+        popup.grab_set()
+
+        selected = {"name": None}
+
+        Label(popup, text="Enter a new course or select an existing one:").pack(pady=10)
+        entry = Entry(popup)
+        entry.pack(pady=5)
+
+        list_frame2 = Frame(popup)
+        list_frame2.pack(fill="both", expand=True, padx=10, pady=5)
+        list_courses = Listbox(list_frame2)
+        list_courses.pack(side="left", fill="both", expand=True)
+        scrollbar2 = Scrollbar(list_frame2, orient="vertical", command=list_courses.yview)
+        scrollbar2.pack(side="right", fill="y")
+        list_courses.config(yscrollcommand=scrollbar2.set)
+
+        for name in flashcards_by_course.keys():
+            list_courses.insert(END, name)
+
+        def confirm():
+            name = entry.get().strip()
+            if not name:  # fallback to listbox
+                sel = list_courses.curselection()
+                if sel:
+                    name = list_courses.get(sel[0])
+                else:
+                    messagebox.showerror("Error", "Please enter a course name.")
+                    return
+            selected["name"] = name
+            if selected["name"] not in flashcards_by_course:
+                flashcards_by_course[selected["name"]] = {}
+            popup.destroy()
+
+        def cancel():
+            selected["name"] = None
+            popup.destroy()
+
+        # Frame for buttons
+        btn_frame = Frame(popup)
+        btn_frame.pack(pady=10)
+        Button(btn_frame, text="Confirm", width=10, command=confirm).pack(side="left", padx=5)
+        Button(btn_frame, text="Cancel", width=10, command=cancel).pack(side="left", padx=5)
+
+        popup.wait_window()
+        return selected["name"]
+
+    def refresh_list():
+        listbox.delete(0, END)
+        if course:
+            for term in flashcards_by_course[course].keys():
+                listbox.insert(END, term)
+
+    def switch_course():
+        nonlocal course
+        course = choose_course()
+        if course:
+            refresh_list()
+
+
+    def add_flashcard():
+        if not course:
+            messagebox.showerror("Error", "No course selected.")
+            return
+        term = simpledialog.askstring("Add Flashcard", "Enter term:", parent=flash_window)
+        if not term:
+            return
+        if term in flashcards_by_course[course]:
+            messagebox.showerror("Error", "Term already exists.")
+            return
+        definition = simpledialog.askstring("Add Flashcard", "Enter definition:", parent=flash_window)
+        if definition is None:
+            return
+        flashcards_by_course[course][term] = definition
+        refresh_list()
+
+    def import_from_csv():
+        if not course:
+            messagebox.showerror("Error", "No course selected.")
+            return
+        path = filedialog.askopenfilename(title="Open CSV", filetypes=[("CSV Files", "*.csv")])
+        if not path:
+            return
+        with open(path, newline='', encoding="utf-8") as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if len(row) >= 2:
+                    term, definition = row[0], row[1]
+                    flashcards_by_course[course][term] = definition
+        refresh_list()
+        messagebox.showinfo("Success", f"Flashcards successfully imported for {course}.")
+
+    def edit_flashcard():
+        if not course:
+            messagebox.showerror("Error", "No course selected.")
+            return
+        sel = listbox.curselection()
+        if not sel:
+            messagebox.showerror("Error", "No flashcard selected.")
+            return
+        term = listbox.get(sel[0])
+        new_definition = simpledialog.askstring("Edit definition", "Enter new definition:", initialvalue=flashcards_by_course[course][term], parent=flash_window)
+        if new_definition is not None:
+            flashcards_by_course[course][term] = new_definition
+            refresh_list()
+
+    def delete_flashcard():
+        if not course:
+            messagebox.showerror("Error", "No course selected.")
+            return
+        sel = listbox.curselection()
+        if not sel:
+            messagebox.showerror("Error", "No flashcard selected.")
+            return
+        term = listbox.get(sel[0])
+        if messagebox.askyesno("Delete", f"Delete flashcard '{term}'?"):
+            flashcards_by_course[course].pop(term)
+            refresh_list()
+
+
+
+    btn_frame = Frame(flash_window)
+    btn_frame.pack(pady=10)
+
+    Button(btn_frame, text="Switch Course", command=switch_course).grid(row=0, column=0, padx=5)
+    Button(btn_frame, text="Add", width=10, command=add_flashcard).grid(row=0, column=1, padx=5)
+    Button(btn_frame, text="Edit", width=10, command=edit_flashcard).grid(row=0, column=2, padx=5)
+    Button(btn_frame, text="Delete", width=10, command=delete_flashcard).grid(row=0, column=3, padx=5)
+    Button(btn_frame, text="Import CSV", width=10, command=import_from_csv).grid(row=0, column=4, padx=5)
+
+    course = choose_course()
+    if not course:
+        flash_window.destroy()
+        return
+    refresh_list()
+
+def start_quiz():
+    quiz_window = Toplevel(root_window)
+    quiz_window.title("Flashcard Quiz")
+    quiz_window.geometry("700x300")
+
+    if not flashcards_by_course:
+        messagebox.showerror("Error", "No flashcards available, please add flashcards to start quiz.")
+        quiz_window.destroy()
+        return
+
+    course_popup = Toplevel(root_window)
+    course_popup.title("Select Course")
+    course_popup.geometry("400x300")
+    Label(course_popup, text="Select a course to start quiz:").pack(pady=10)
+
+    listbox = Listbox(course_popup)
+    listbox.pack(fill="both", expand=True, padx=10, pady=5)
+    for c in flashcards_by_course:
+        listbox.insert(END, c)
+
+    selected_course = {"name": None}
+
+    def confirm_course():
+        sel = listbox.curselection()
+        if sel:
+            selected_course["name"] = listbox.get(sel[0])
+            course_popup.destroy()
+        else:
+            messagebox.showerror("Error", "Please select a course.")
+
+    Button(course_popup, text="Start Quiz", command=confirm_course).pack(pady=10)
+
+    course_popup.wait_window()
+
+    course = selected_course["name"]
+    if not course or course not in flashcards_by_course or not flashcards_by_course[course]:
+        messagebox.showerror("Error", "No flashcards for this course.")
+        return
+
+    terms_dict = flashcards_by_course[course]
+    terms = list(terms_dict.keys())
+
+    current_flash_index = 0
+    correct_answers = 0
+    incorrect_answers = 0
+    card_marked = {term: False for term in terms}
+    total = len(terms)
+
+    term_label = Label(quiz_window, text="", font=("Arial",14,"bold"))
+    term_label.pack(pady=20)
+    definition_label = Label(quiz_window, text="", font=("Arial",14,"bold"))
+    definition_label.pack(pady=10)
+
+    def show_next_card():
+        nonlocal current_flash_index
+        if current_flash_index < total:
+            term = terms[current_flash_index]
+            term_label.configure(text=term)
+            definition_label.configure(text="")
+        else:
+            messagebox.showinfo("Quiz finished.", f"You reviewed {total} flashcards \nCorrect Answers: {correct_answers} \nIncorrect/Skipped Answers: {incorrect_answers}.")
+            quiz_window.destroy()
+
+    def show_answer():
+        term = terms[current_flash_index]
+        definition_label.configure(text=terms_dict[term])
+
+    def next_card():
+        nonlocal current_flash_index, incorrect_answers
+        term = terms[current_flash_index]
+        if not card_marked[term]:
+            incorrect_answers += 1
+            card_marked[term] = True
+        current_flash_index += 1
+        show_next_card()
+
+    def mark_correct():
+        nonlocal correct_answers, current_flash_index
+        term = terms[current_flash_index]
+        if not card_marked[term]:
+            correct_answers += 1
+            card_marked[term] = True
+        next_card()
+
+    def mark_incorrect():
+        nonlocal incorrect_answers, current_flash_index
+        term = terms[current_flash_index]
+        if not card_marked[term]:
+            incorrect_answers += 1
+            card_marked[term] = True
+        next_card()
+
+    def stop_quiz():
+        reviewed = current_flash_index
+        messagebox.showinfo("Quiz finished", f"You reviewed {total} flashcards \nCorrect answers: {correct_answers} \nIncorrect/Skipped answers: {incorrect_answers}.")
+        quiz_window.destroy()
+
+    btn_frame = Frame(quiz_window)
+    btn_frame.pack(pady=10)
+
+    Button(btn_frame, text="I knew it", width=12, command=mark_correct).grid(row=0, column=0, padx=10)
+    Button(btn_frame, text="I didn't know it", width=12, command=mark_incorrect).grid(row=0, column=1, padx=10)
+
+    nav_frame = Frame(quiz_window)
+    nav_frame.pack(pady=10)
+
+    Button(nav_frame, text="Show Answer", width=12, command=show_answer).grid(row=0, column=0, padx=10)
+    Button(nav_frame, text="Next", width=12, command=next_card).grid(row=0, column=1, padx=10)
+    Button(nav_frame, text="Stop Quiz", width=12, command=stop_quiz).grid(row=0, column=2, padx=10)
+
+    show_next_card()
 
 # -----------------------------------------
 #  FUNCTION: Pomodoro Timer
@@ -1089,5 +1355,6 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
