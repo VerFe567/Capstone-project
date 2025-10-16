@@ -1091,3 +1091,4 @@ show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
 
 
+
