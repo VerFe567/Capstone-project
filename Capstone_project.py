@@ -664,17 +664,24 @@ def manage_courses():
             courses[new_name] = color
             course_colors[new_name] = color
 
-        # Update all sessions in the calendar
-        for key, info in list(sessions.items()):
+        # Update all existing sessions in the calendar that use this course
+        for key, info in sessions.items():
             if info["course"] == old_name:
+                # Update course name and color
                 info["course"] = new_name
                 info["color"] = color
-                cell = cells[key]
 
-                # Determine if this cell is the top cell of the session
+        # Now update all cells in the calendar
+        for key, cell in cells.items():
+            if key in sessions:
+                session_info = sessions[key]
+                # Determine if this is the top cell of the session
                 above_key = (key[0] - 1, key[1])
-                first_cell = not (above_key in sessions and sessions[above_key]["course"] == new_name)
-                cell.config(text=new_name if first_cell else "", bg=color)
+                is_top_cell = True
+                if above_key in sessions and sessions[above_key]["course"] == session_info["course"]:
+                    is_top_cell = False
+                # Update text and background
+                cell.config(text=session_info["course"] if is_top_cell else "", bg=session_info["color"])
 
         # Refresh listbox
         listbox.delete(selection[0])
@@ -1082,3 +1089,5 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
+
