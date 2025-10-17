@@ -11,6 +11,7 @@ import json
 import csv
 import os
 
+
 # --- MAIN WINDOW SETUP ---
 root_window = Tk()
 root_window.title("Weekly Calendar")
@@ -51,210 +52,261 @@ main_frame.pack(fill="both", expand=True)
 # ==========================
 # NOTE SYSTEM (from Program 1, adapted for menu use)
 # ==========================
-notes = []  # Each note: {"date": "...", "time": "...", "day": "...", "type": "text/file/audio", "content": ...}
 
-NOTE_ICON = "📝"  # not used on cells in this menu-based version, but kept if you later attach notes to cells
+import datetime, json, csv, os
+from tkinter import Toplevel, StringVar, Text, Canvas, Frame, Label, END
+from tkinter import filedialog, messagebox
+from tkinter import ttk
+
+
+notes = []
+NOTE_ICON = "📝"
+
+def _make_labeled(parent, widget_cls, label, **opts):
+    frm = ttk.Frame(parent)
+    frm.pack(fill="x", padx=20, pady=5)
+    ttk.Label(frm, text=label).pack(side="left")
+    w = widget_cls(frm, **opts)
+    w.pack(side="left", fill="x", expand=True, padx=(5,0))
+    return w
+
+def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New Note", subtitle_text=None):
+    data = note.copy() if note else {}
+    editor = Toplevel(parent)
+    editor.title(title_text); editor.transient(parent); editor.grab_set()
+
+    # Header
+    ttk.Label(editor, text=title_text, font=("Arial",12,"bold")).pack(pady=(12,4))
+    if subtitle_text:
+        ttk.Label(editor, text=subtitle_text, font=("Arial",10)).pack(pady=(0,8))
+
+    # Course dropdown first
+    opts = ["General"] + [c for c in (courses_list or []) if c!="General"]
+    if data.get("course") and data["course"] not in opts:
+        opts.append(data["course"])
+    course_var = StringVar(value=data.get("course") or "General")
+    _make_labeled(editor, ttk.Combobox, "Course:", textvariable=course_var,
+                 values=opts, state="readonly", width=25)
+
+    # Title entry
+    title_entry = _make_labeled(editor, ttk.Entry, "Title:")
+    if data.get("title"):
+        title_entry.insert(0, data["title"])
+
+    # Description text box
+    desc_frame = ttk.Frame(editor)
+    ttk.Label(desc_frame, text="Description:").pack(anchor="w", padx=20, pady=(5,0))
+    content_txt = Text(desc_frame, wrap="word", height=8)
+    content_txt.pack(fill="both", expand=True, padx=20, pady=(0,5))
+    if data.get("content") and data.get("type","text")=="text":
+        content_txt.insert("1.0", data["content"])
+    desc_frame.pack(fill="both", expand=True)
+
+    # Attachment buttons: audio and file
+    attachment_var = StringVar(value=(data.get("content") if data.get("type") in ["file","audio"] else ""))
+    attachment_type = StringVar(value=(data.get("type") if data.get("type") in ["file","audio"] else ""))
+    attach_frame = ttk.Frame(editor)
+    attach_frame.pack(fill="x", padx=20, pady=5)
+    def browse_file():
+        path = filedialog.askopenfilename()
+        if path:
+            attachment_var.set(path)
+            attachment_type.set("file")
+    def browse_audio():
+        path = filedialog.askopenfilename(filetypes=[("Audio Files","*.mp3 *.wav *.ogg")])
+        if path:
+            attachment_var.set(path)
+            attachment_type.set("audio")
+    # Audio icon button
+    ttk.Button(attach_frame, text="🎤", width=3, command=browse_audio).pack(side="left", padx=(0,10))
+    # File icon button
+    ttk.Button(attach_frame, text="📁", width=3, command=browse_file).pack(side="left", padx=(0,10))
+    ttk.Label(attach_frame, textvariable=attachment_var).pack(side="left", fill="x", expand=True)
+
+    res = {}
+    def _save():
+        # Gather input values
+        t = title_entry.get().strip()
+        desc = content_txt.get("1.0",END).strip()
+        attach = attachment_var.get().strip()
+        # Require at least title or content (desc or attachment)
+        if not t and not desc and not attach:
+            messagebox.showerror("Missing Info","Enter title or content.",parent=editor)
+            return
+        # Determine note type and content
+        if attach:
+            nt = attachment_type.get() or 'file'
+            content_val = attach
+        else:
+            nt = 'text'
+            content_val = desc
+        # Build result
+        res['value'] = {
+            "title": t,
+            "content": content_val,
+            "course": None if course_var.get()=="General" else course_var.get(),
+            "type": nt
+        }
+        editor.destroy()
+
+    btnf = ttk.Frame(editor)
+    btnf.pack(pady=12)
+    ttk.Button(btnf, text="Save",   command=_save).pack(side="left", padx=5)
+    ttk.Button(btnf, text="Cancel", command=editor.destroy).pack(side="left", padx=5)
+    editor.wait_window()
+    return res.get("value")
 
 def save_notes_json():
     if not notes:
-        messagebox.showwarning("No Notes", "There are no notes to save.")
-        return
-    file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files","*.json")])
-    if not file:
-        return
-    try:
-        with open(file, "w", encoding="utf-8") as f:
-            json.dump(notes, f, indent=4, ensure_ascii=False)
-        messagebox.showinfo("Saved", f"Notes saved to {file}")
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to save notes: {e}")
+        return messagebox.showwarning("No Notes","No notes to save.")
+    path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON","*.json")])
+    if not path: return
+    with open(path,"w",encoding="utf-8") as f:
+        json.dump(notes,f,indent=4,ensure_ascii=False)
+    messagebox.showinfo("Saved",f"Notes saved to {path}")
 
 def save_notes_csv():
     if not notes:
-        messagebox.showwarning("No Notes", "There are no notes to save.")
-        return
-    file = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files","*.csv")])
-    if not file:
-        return
+        return messagebox.showwarning("No Notes","No notes to save.")
+    path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
+    if not path: return
     keys = ["date","day","time","type","content"]
-    try:
-        with open(file, "w", newline='', encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=keys)
-            writer.writeheader()
-            for note in notes:
-                writer.writerow(note)
-        messagebox.showinfo("Saved", f"Notes saved to {file}")
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to save notes: {e}")
+    with open(path,"w",newline="",encoding="utf-8") as f:
+        writer = csv.DictWriter(f,fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(notes)
+    messagebox.showinfo("Saved",f"Notes saved to {path}")
 
-def add_note_from_cell(row, col):
-    """Attach a note to a specific cell in the study planner"""
-    # Determine contextual info
-    day = days[col]
-    time_label = times[row - 1]
-    today = datetime.date.today().isoformat()
-
-    dialog = Toplevel(root_window)
-    dialog.title(f"Add Note for {day} {time_label}")
-    dialog.minsize(width=250, height=150)
-    choice = {"value": None}
-
-    def set_choice(v):
-        choice["value"] = v
-        dialog.destroy()
-
-    Label(dialog, text="Select note type:").pack(pady=10)
-    Button(dialog, text="Text", width=10, command=lambda: set_choice("text")).pack(pady=5)
-    Button(dialog, text="File", width=10, command=lambda: set_choice("file")).pack(pady=5)
-    Button(dialog, text="Audio", width=10, command=lambda: set_choice("audio")).pack(pady=5)
-    dialog.wait_window()
-    typ = choice.get("value")
-    if not typ:
-        return
-
-    # Get content
-    content = None
-    if typ == "text":
-        content = simpledialog.askstring("Input", "Enter note text:", parent=root_window)
-        if not content:
-            return
-    else:
-        filetypes = [("All files", "*.*")]
-        if typ == "audio":
-            filetypes = [("Audio files", "*.mp3 *.wav"), ("All files", "*.*")]
-        content = filedialog.askopenfilename(title="Select file", filetypes=filetypes, parent=root_window)
-        if not content:
-            return
-
-    # Store note
+def add_note_from_cell(row,col):
+    vals = launch_note_editor(root_window, courses_list=list(courses.keys()),
+                              title_text="New Note",
+                              subtitle_text=f"{days[col]} • {times[row-1]}")
+    if not vals: return
+    now = datetime.datetime.now()
     note = {
-        "date": today,
-        "time": time_label,
-        "day": day,
-        "type": typ,
-        "content": content
+        "date": now.date().isoformat(),
+        "day": days[col],
+        "time": times[row-1],
+        "type": vals["type"],
+        "content": vals["content"],
+        "updated": now.isoformat()
     }
+    if vals.get("title"):  note["title"]  = vals["title"]
+    if vals.get("course"): note["course"] = vals["course"]
     notes.append(note)
-    messagebox.showinfo("Note Added", f"Note added for {day} at {time_label}.")
+    messagebox.showinfo("Note Added",f"Note added for {note['day']} at {note['time']}.")
+    cell = cells.get((row,col))
+    if cell and NOTE_ICON not in cell.cget("text"):
+        cell.config(text=f"{cell.cget('text')} {NOTE_ICON}".strip())
+    root_window.event_generate("<<NotesUpdated>>")
 
-    # Optional: mark icon in cell
-    cell = cells.get((row, col))
-    if cell:
-        text = cell.cget("text")
-        if NOTE_ICON not in text:
-            cell.config(text=f"{text} {NOTE_ICON}".strip())
-
-    def set_choice(v):
-        choice["value"] = v
-        dialog.destroy()
-    Label(dialog, text="Select note type:").pack(pady=10)
-    Button(dialog, text="Text", width=10, command=lambda: set_choice("text")).pack(pady=5)
-    Button(dialog, text="File", width=10, command=lambda: set_choice("file")).pack(pady=5)
-    Button(dialog, text="Audio", width=10, command=lambda: set_choice("audio")).pack(pady=5)
-    dialog.wait_window()
-    typ = choice.get("value")
-    if not typ:
-        return
-
-    content = None
-    if typ == "text":
-        content = simpledialog.askstring("Input", "Enter note text:", parent=parent)
-        if not content:
-            return
+def add_note_from_notes_window(parent, note_index=None):
+    note = notes[note_index] if note_index is not None and 0<=note_index<len(notes) else None
+    vals = launch_note_editor(parent, note=note, courses_list=list(courses.keys()), title_text="Edit Note" if note else "New Note")
+    if not vals: return
+    now = datetime.datetime.now()
+    new = {
+        "date": note["date"] if note else now.date().isoformat(),
+        "day":  note["day"]  if note else now.strftime("%A"),
+        "time": note["time"] if note else now.strftime("%H:%M"),
+        "type": note["type"] if note else "text",
+        "content": vals["content"],
+        "updated": now.isoformat()
+    }
+    if vals.get("title"):  new["title"]  = vals["title"]
+    if vals.get("course"): new["course"] = vals["course"]
+    if note_index is None or note is None:
+        notes.append(new)
     else:
-        filetypes = [("All files", "*.*")]
-        if typ == "audio":
-            filetypes = [("Audio files", "*.mp3 *.wav"), ("All files", "*.*")]
-        content = filedialog.askopenfilename(title="Select file", filetypes=filetypes, parent=parent)
-        if not content:
-            return
-
-    note = {
-        "date": datetime.date.today().isoformat(),
-        "time": datetime.datetime.now().strftime("%H:%M"),
-        "day": datetime.date.today().strftime("%A"),
-        "type": typ,
-        "content": content
-    }
-    notes.append(note)
-    messagebox.showinfo("Note Added", "Your note has been added.", parent=parent)
-    # When the notes window is open, refresh its list (it will handle refresh on focus/after add)
-    try:
-        parent.event_generate("<<NotesUpdated>>")
-    except:
-        pass
+        notes[note_index] = new
+    parent.event_generate("<<NotesUpdated>>")
 
 def open_notes_system():
-    ns = Toplevel(root_window)
-    ns.title("Note System")
-    ns.geometry("520x420")
+    ns = Toplevel(root_window); ns.title("Notes"); ns.geometry("720x520")
+    ns.configure(bg="#fff")
+    # Header
+    hf = Frame(ns,bg="#fff"); hf.pack(fill="x",padx=20,pady=(20,10))
+    Label(hf,text="Notes",font=("Arial",20,"bold"),bg="#fff",fg="#0f172a").pack(side="left")
+    ttk.Button(hf,text="+ New Note",command=lambda:add_note_from_notes_window(ns)).pack(side="right")
+    Label(hf,text=datetime.date.today().strftime("%A, %B %d, %Y"),font=("Arial",11),bg="#fff",fg="#475569").pack(anchor="w",pady=(4,0))
 
-    Label(ns, text="All Notes", font=("Arial", 12, "bold")).pack(pady=5)
+    # Scrollable area
+    cf = Frame(ns,bg="#fff"); cf.pack(fill="both",expand=True)
+    canvas = Canvas(cf,bg="#fff",highlightthickness=0)
+    sb = ttk.Scrollbar(cf,orient="vertical",command=canvas.yview)
+    canvas.configure(yscrollcommand=sb.set)
+    sb.pack(side="right",fill="y"); canvas.pack(side="left",fill="both",expand=True)
+    cards = Frame(canvas,bg="#fff")
+    win = canvas.create_window((0,0),window=cards,anchor="nw")
+    cards.bind("<Configure>",lambda e:canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.bind("<Configure>", lambda e: canvas.itemconfig(win, width=e.width))
+    canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", lambda ev: canvas.yview_scroll(-int(ev.delta/120), "units")))
+    canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
-    listbox = Listbox(ns)
-    listbox.pack(fill="both", expand=True, padx=10, pady=5)
+    # Footer buttons
+    ff = Frame(ns,bg="#fff"); ff.pack(fill="x",padx=20,pady=10)
+    ttk.Button(ff,text="Save JSON",command=save_notes_json).pack(side="left",padx=(0,10))
+    ttk.Button(ff,text="Save CSV", command=save_notes_csv).pack(side="left",padx=(0,10))
+    ttk.Button(ff,text="Close",     command=ns.destroy).pack(side="right")
 
-    def refresh_listbox():
-        listbox.delete(0, END)
-        for i, note in enumerate(notes, start=1):
-            content_preview = note['content']
-            if note['type'] == 'text':
-                preview = (content_preview[:40] + '...') if len(content_preview) > 40 else content_preview
-            else:
-                preview = os.path.basename(content_preview)
-            summary = f"{i}. {note['date']} {note['day']} {note['time']} [{note['type']}] {preview}"
-            listbox.insert(END, summary)
+    def badge_colors(name):
+        bg = course_colors.get(name,"#0ea5e9") if name else "#0ea5e9"
+        r,g,b = ns.winfo_rgb(bg)
+        bright = (0.299*r+0.587*g+0.114*b)/65535
+        fg = "#0f172a" if bright>0.75 else "#fff"
+        return bg, fg
 
-    refresh_listbox()
-
-    def view_note(event=None):
-        sel = listbox.curselection()
-        if not sel:
-            return
-        idx = sel[0]
-        note = notes[idx]
-        if note['type'] == 'text':
-            txt_win = Toplevel(ns)
-            txt_win.title("Note - Text")
-            txt = Text(txt_win, wrap="word", width=60, height=15)
-            txt.insert("1.0", note['content'])
-            txt.config(state="disabled")
-            txt.pack(fill="both", expand=True)
+    def open_item(obj):
+        if obj["type"]=="text":
+            w = Toplevel(ns); txt=Text(w,wrap="word",width=60,height=18)
+            txt.insert("1.0",obj["content"]); txt.config(state="disabled"); txt.pack(fill="both",expand=True)
         else:
-            path = note['content']
             try:
-                if os.name == 'nt':
-                    os.startfile(path)
-                else:
-                    if os.system(f'xdg-open "{path}"') != 0:
-                        messagebox.showerror("Error", "Cannot open file on this platform.", parent=ns)
+                os.startfile(obj["content"]) if os.name=="nt" else os.system(f'xdg-open "{obj["content"]}"')
             except Exception as e:
-                messagebox.showerror("Error", f"Cannot open file: {e}", parent=ns)
+                messagebox.showerror("Error",f"Cannot open file: {e}",parent=ns)
 
-    def delete_note():
-        sel = listbox.curselection()
-        if not sel:
-            messagebox.showerror("Error", "No note selected to delete.", parent=ns)
-            return
-        idx = sel[0]
-        note = notes[idx]
-        confirm = messagebox.askyesno("Confirm Delete", f"Delete note from {note['day']} {note['time']}?")
-        if not confirm:
-            return
-        notes.pop(idx)
-        refresh_listbox()
-        messagebox.showinfo("Deleted", "Note deleted successfully.", parent=ns)
+    def render_card(idx,obj):
+        cf = Frame(cards,bg="#fff",highlightthickness=1,highlightbackground="#e2e8f0")
+        cf.pack(fill="x",padx=20,pady=10)
+        trow = Frame(cf,bg="#fff"); trow.pack(fill="x",padx=20,pady=(18,6))
+        bg,fg = badge_colors(obj.get("course"))
+        Label(trow,text=obj.get("course") or "General",bg=bg,fg=fg,font=("Arial",10,"bold"),padx=10,pady=4).pack(side="left")
+        act = Frame(trow,bg="#fff"); act.pack(side="right")
+        ttk.Button(act,text="Edit",  width=6, command=lambda i=idx:add_note_from_notes_window(ns,i)).pack(side="left",padx=(0,6))
+        ttk.Button(act,text="Delete",width=6, command=lambda i=idx:(notes.pop(i),ns.event_generate("<<NotesUpdated>>"))).pack(side="left")
 
-    listbox.bind('<Double-Button-1>', view_note)
+        # Compute icon for attachment type
+        icon = ""
+        if obj.get("type") == "audio":
+            icon = " 🎤"
+        elif obj.get("type") == "file":
+            # Show image icon for common image extensions
+            ext = os.path.splitext(obj.get("content",""))[1].lower()
+            if ext in [".png",".jpg",".jpeg",".gif",".bmp"]:
+                icon = " 🖼️"
+            else:
+                icon = " 📁"
+        title_text = f"{obj.get('title','Untitled')}{icon}"
+        Label(cf, text=title_text, font=("Arial",16,"bold"), bg="#fff", fg="#0f172a").pack(anchor="w", padx=20)
+        Label(cf,text=obj.get("content",""),font=("Arial",11),bg="#fff",fg="#1f2937",justify="left",wraplength=620).pack(anchor="w",padx=20,pady=(4,12))
+        dt = datetime.datetime.fromisoformat(obj.get("updated")) if obj.get("updated") else None
+        Label(cf,text=(dt.strftime("Updated %d/%m/%Y, %H:%M:%S") if dt else f"Created {obj['date']} {obj['time']}"),
+              font=("Arial",10),bg="#fff",fg="#64748b").pack(anchor="w",padx=20,pady=(0,18))
+        for w in cf.winfo_children()+trow.winfo_children():
+            w.bind("<Double-Button-1>",lambda e,o=obj: open_item(o))
 
-    btn_frame = Frame(ns)
-    btn_frame.pack(pady=5)
-    Button(btn_frame, text="Add Note", command=lambda: add_note_from_notes_window(ns)).pack(side="left", padx=5)
-    Button(btn_frame, text="Delete Note", command=delete_note).pack(side="left", padx=5)
-    Button(btn_frame, text="Save JSON", command=save_notes_json).pack(side="left", padx=5)
-    Button(btn_frame, text="Save CSV", command=save_notes_csv).pack(side="left", padx=5)
-    Button(btn_frame, text="Close", command=ns.destroy).pack(side="left", padx=5)
+    def refresh(_=None):
+        for w in cards.winfo_children(): w.destroy()
+        if not notes:
+            Label(cards, text="No notes yet. Click 'New Note' to get started.",
+                  font=("Arial",12),bg="#fff",fg="#64748b").pack(pady=60)
+        else:
+            for i,obj in sorted(enumerate(notes), key=lambda x: x[1].get("updated",""), reverse=True):
+                render_card(i,obj)
 
+    ns.bind("<<NotesUpdated>>",refresh)
+    refresh()
 # ==========================
 # End Note System
 # ==========================
@@ -1089,5 +1141,6 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
