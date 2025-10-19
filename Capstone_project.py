@@ -575,7 +575,6 @@ def edit_or_delete_study_session(row=None, col=None):
     Button(popup, text="Edit", width=15, command=lambda: set_choice("edit")).pack(pady=3)
     Button(popup, text="Delete", width=15, command=lambda: set_choice("delete")).pack(pady=3)
     Button(popup, text="Add Note", width=15, command=lambda: set_choice("note")).pack(pady=3)
-    Button(popup, text="Cancel", width=15, command=lambda: set_choice("cancel")).pack(pady=3)
 
     popup.wait_window()
     if choice["value"] == "note" and row and col:
@@ -1111,7 +1110,6 @@ def setup_menu():
     study_menu.add_command(label="Open Planner", command=study_planner)
     menubar.add_cascade(label="Study Planner", menu=study_menu)
     study_menu.add_separator()
-    study_menu.add_command(label="Exit", command=root_window.quit)
 
     # --- Course Hour Tracker Menu ---
     tracker_menu = Menu(menubar, tearoff=0)
@@ -1141,6 +1139,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
