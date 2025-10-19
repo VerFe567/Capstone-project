@@ -45,6 +45,40 @@ for name, color in zip(default_courses, default_colors):
 colors = ["lightgray", "lightcoral", "lightcyan", "yellow", "green", "pink",]
 color_index = 0
 
+# --- DEFAULT NOTES AT STARTUP ---
+notes = [
+    {
+        "date": "2025-10-19",
+        "day": "Monday",
+        "time": "9:00",
+        "type": "text",
+        "content": "buy textbooks + 2 chickens + bicycle",
+        "title": "Shopping list",
+        "course": "General",        
+        "updated": "2025-10-19T09:00:00"
+    },
+    {
+        "date": "2025-10-19",
+        "day": "Monday",
+        "time": "11:30",
+        "type": "text",
+        "content": "Key process: ATP (adenosine triphosphate) production. They have a double membrane (outer and highly folded inner membrane, called cristae). The folding increases the surface area for enzyme reactions",
+        "title": "Mitochondria",
+        "course": "Biology",
+        "updated": "2025-10-19T11:30:00"
+    },
+    {
+        "date": "2025-10-20",
+        "day": "Tuesday",
+        "time": "14:00",
+        "type": "audio",
+        "content": "C:/path/to/sample.mp3",
+        "title": "Lecture recording",
+        "course": "Math",
+        "updated": "2025-10-20T14:00:00"
+    }
+]
+
 # --- GLOBALS ---
 main_frame = Frame(root_window)
 main_frame.pack(fill="both", expand=True)
@@ -58,8 +92,6 @@ from tkinter import Toplevel, StringVar, Text, Canvas, Frame, Label, END
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 
-
-notes = []
 NOTE_ICON = "📝"
 
 def _make_labeled(parent, widget_cls, label, **opts):
@@ -1139,6 +1171,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
