@@ -32,6 +32,7 @@ sessions = {}          # Stores scheduled study sessions
 courses = {}           # Stores course names and colors
 course_colors = {}     # Stores color for each course
 tracked_hours = {}     # Stores accumulated Pomodoro study time per course
+flashcards_by_course = {}
 
 # --- DEFAULT COURSES AT STARTUP ---
 default_courses = ["Math", "History", "Biology"]
@@ -983,7 +984,7 @@ def manage_flashcards():
             refresh_list()
     def add_flashcard():
         nonlocal course
-        course_name = choose_course(flash_window)
+        course_name = choose_course
         if not course_name:
             return
         if course_name not in flashcards_by_course:
@@ -1309,8 +1310,8 @@ def setup_menu():
 
     # --- Flashcards ---
     flash_quiz_menu = Menu(menubar, tearoff=0)
-    flash_quiz_menu.add_command(label="Open Flashcards", command=flashcards)
-    flash_quiz_menu.add_command(label="Open Quiz", command=quizzes)
+    flash_quiz_menu.add_command(label="Open Flashcards", command=manage_flashcards)
+    flash_quiz_menu.add_command(label="Open Quiz", command=start_quiz)
     menubar.add_cascade(label="Flashcards & Quizzes", menu=flash_quiz_menu)
 
     # --- Pomodoro timer ---
@@ -1324,7 +1325,6 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
-
 
 
 
