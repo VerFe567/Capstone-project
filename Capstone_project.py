@@ -419,7 +419,7 @@ def show_instructions():
     header = Label(main_frame, text="Welcome to the Study Planner!", font=("Arial", 14, "bold"))
     header.pack(pady=5)
 
-    instructions_text = """This application helps you plan weekly study sessions, manage courses, track total hours, write notes, 
+    instructions_text = """ This application helps you plan weekly study sessions, manage courses, track total hours, write notes, 
 use flashcards for learning, and manage your focus with the Pomodoro timer.
 
 ==============================
@@ -437,8 +437,9 @@ COURSE TRACKER & MANAGER
 Manage all your courses and track weekly study hours.
 - “Add Course” to create a new subject with a custom color.
 - “Edit” or “Delete” to rename or remove a course and its sessions.
-The hour tracker shows total time (0.5h per block) and visualizes hours per course.
-- Add hours to the tracker using the "Add Study Hours" button
+
+The hour tracker shows total time and visualizes hours per course.
+- Add hours to the tracker with the "Add Study Hours" button
 
 ==============================
 NOTE SYSTEM
@@ -454,7 +455,8 @@ FLASHCARDS & QUIZZES
 ==============================
 Create flashcards to test your knowledge by course.
 - Add cards with a term and definition.
-- Start a quiz session to practice your recall and check your progress.
+- “Edit” or “Delete” to rename or remove a flashcard.
+- Start a quiz session to practice your recall.
 
 ==============================
 POMODORO TIMER
@@ -463,7 +465,7 @@ Focus effectively using the Pomodoro system (25 min study + 5 min break).
 - Choose a course and click “Start” to begin.
 - After completion, you can log 0.5 hour of study automatically.
 - Use “Stop” or “Reset” if needed.
-"""
+    """
 
     text_box = Text(main_frame, wrap="word", font=("Arial", 11), padx=15, pady=10)
     text_box.insert("1.0", instructions_text)
@@ -1390,6 +1392,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
