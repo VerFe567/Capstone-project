@@ -1,8 +1,6 @@
 # ONE THING TO CONSIDER IS THE DELETE OF COURSES WHEN THE TRACKER IS OPENED. THIS DOESNOT WORK!!!
 # ANOTHER THING IS THE SPACE ABOVE THE PLANNER WHEN OPENED IN FULL SCREEN
 
-#when editing courses and changing the time spent on the new course to less than the first input the colors stay -Feie
-
 from tkinter import *
 from tkinter import simpledialog, messagebox, colorchooser, filedialog
 import winsound
@@ -421,15 +419,51 @@ def show_instructions():
     header = Label(main_frame, text="Welcome to the Study Planner!", font=("Arial", 14, "bold"))
     header.pack(pady=5)
 
-    instructions_text = (
-        "- Add new courses via the 'Manage Courses' option in the Study Planner menu.\n"
-        "- Click on calendar cells to add a study session.\n"
-        "- Left-click on an existing session to edit or delete it.\n"
-        "- Right-click on a session to start a Pomodoro timer for that course.\n\n"
-        "Additional features:\n"
-        "- Add notes, create flashcards and quizzes, or start the Pomodoro timer from the menu.\n"
-        "- Track scheduled hours per course in the Course Hour Tracker."
-    )
+    instructions_text = """This application helps you plan weekly study sessions, manage courses, track total hours, write notes, 
+use flashcards for learning, and manage your focus with the Pomodoro timer.
+
+==============================
+STUDY PLANNER
+==============================
+Use the planner to schedule study sessions for each day and time slot.
+- Left-click an empty cell to add a study session: choose a course and its duration (in 30-minute slots).
+- Left-click an existing session to edit of delete the study session.
+- Right-click a session to add a note or start a Pomodoro timer.
+- Click “Clear Planner” to reset the whole week.
+
+==============================
+COURSE TRACKER & MANAGER
+==============================
+Manage all your courses and track weekly study hours.
+- “Add Course” to create a new subject with a custom color.
+- “Edit” or “Delete” to rename or remove a course and its sessions.
+The hour tracker shows total time (0.5h per block) and visualizes hours per course.
+- Add hours to the tracker using the "Add Study Hours" button
+
+==============================
+NOTE SYSTEM
+==============================
+Create and organize notes for each course.
+- Use “+ New Note” to add a note with title, content, or attachments (text, files, or audio).
+- Double-click a note to open it.
+- Export your notes as JSON or CSV from the Note System window.
+- Notes can be added directly from planner cells.
+
+==============================
+FLASHCARDS & QUIZZES
+==============================
+Create flashcards to test your knowledge by course.
+- Add cards with a term and definition.
+- Start a quiz session to practice your recall and check your progress.
+
+==============================
+POMODORO TIMER
+==============================
+Focus effectively using the Pomodoro system (25 min study + 5 min break).
+- Choose a course and click “Start” to begin.
+- After completion, you can log 0.5 hour of study automatically.
+- Use “Stop” or “Reset” if needed.
+"""
 
     text_box = Text(main_frame, wrap="word", font=("Arial", 11), padx=15, pady=10)
     text_box.insert("1.0", instructions_text)
@@ -1356,6 +1390,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
