@@ -227,9 +227,6 @@ def add_note_from_cell(row,col):
     if vals.get("course"): note["course"] = vals["course"]
     notes.append(note)
     messagebox.showinfo("Note Added",f"Note added for {note['day']} at {note['time']}.")
-    cell = cells.get((row,col))
-    if cell and NOTE_ICON not in cell.cget("text"):
-        cell.config(text=f"{cell.cget('text')} {NOTE_ICON}".strip())
     root_window.event_generate("<<NotesUpdated>>")
 
 def add_note_from_notes_window(parent, note_index=None):
@@ -366,7 +363,8 @@ def create_table():
 
             # Bind click actions
             cell.bind("<Button-1>", lambda e, r=row, c=col: click_on_cell(r, c))
-            cell.bind("<Button-3>", lambda e, r=row, c=col: start_pomodoro_from_cell(r, c))
+            cell.bind("<Button-3>", lambda e, r=row, c=col: show_cell_menu(e, r, c))
+
 
             cells[(row, col)] = cell
 
@@ -1420,6 +1418,9 @@ def pomodoro_timer(selected_course=None, count_hours=True):
     Button(button_frame, text="Stop", width=10, command=stop_timer).grid(row=0, column=1, padx=5)
     Button(button_frame, text="Reset", width=10, command=reset_timer).grid(row=0, column=2, padx=5)
 
+
+
+
 # -----------------------------------------
 #  FUNCTION: Bind timer and schedule
 # -----------------------------------------
@@ -1433,6 +1434,19 @@ def start_pomodoro_from_cell(row, col):
 
     course_name = sessions[key]["course"]
     pomodoro_timer(selected_course=course_name)
+
+
+# Show right-clic menu for calendar cells to add timer or notes
+def show_cell_menu(event, row, col):
+    """Shows context menu with options to add timer or add note for a cell."""
+    menu = Menu(root_window, tearoff=0)
+    menu.add_command(label="Add Timer", command=lambda r=row, c=col: pomodoro_timer())
+    menu.add_command(label="Add Note", command=lambda r=row, c=col: add_note_from_cell(r, c))
+    try:
+        menu.tk_popup(event.x_root, event.y_root)
+    finally:
+        menu.grab_release()
+
 
 # -----------------------------------------
 #  MENU BAR
@@ -1476,6 +1490,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
