@@ -366,7 +366,8 @@ def create_table():
 
             # Bind click actions
             cell.bind("<Button-1>", lambda e, r=row, c=col: click_on_cell(r, c))
-            cell.bind("<Button-3>", lambda e, r=row, c=col: start_pomodoro_from_cell(r, c))
+            cell.bind("<Button-3>", lambda e, r=row, c=col: show_cell_menu(e, r, c))
+
 
             cells[(row, col)] = cell
 
@@ -1350,6 +1351,21 @@ def start_pomodoro_from_cell(row, col):
     course_name = sessions[key]["course"]
     pomodoro_timer(selected_course=course_name)
 
+
+# Show right-clic menu for calendar cells to add timer or notes
+def show_cell_menu(event, row, col):
+    """Shows context menu with options to add timer or add note for a cell."""
+    menu = Menu(root_window, tearoff=0)
+    menu.add_command(label="Add Timer", command=lambda r=row, c=col: pomodoro_timer())
+    menu.add_command(label="Add Note", command=lambda r=row, c=col: add_note_from_cell(r, c))
+    try:
+        menu.tk_popup(event.x_root, event.y_root)
+    finally:
+        menu.grab_release()
+
+
+
+
 # -----------------------------------------
 #  MENU BAR
 # -----------------------------------------
@@ -1392,6 +1408,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
