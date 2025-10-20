@@ -227,9 +227,6 @@ def add_note_from_cell(row,col):
     if vals.get("course"): note["course"] = vals["course"]
     notes.append(note)
     messagebox.showinfo("Note Added",f"Note added for {note['day']} at {note['time']}.")
-    cell = cells.get((row,col))
-    if cell and NOTE_ICON not in cell.cget("text"):
-        cell.config(text=f"{cell.cget('text')} {NOTE_ICON}".strip())
     root_window.event_generate("<<NotesUpdated>>")
 
 def add_note_from_notes_window(parent, note_index=None):
@@ -1408,6 +1405,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
