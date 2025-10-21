@@ -82,7 +82,6 @@ main_frame.pack(fill="both", expand=True)
 # ==========================
 # NOTE SYSTEM (from Program 1, adapted for menu use)
 # ==========================
-NOTE_ICON = "📝"
 
 def _make_labeled(parent, widget_cls, label, **opts):
     frm = ttk.Frame(parent)
@@ -214,14 +213,21 @@ def add_note_from_cell(row,col):
                               title_text="New Note",
                               subtitle_text=f"{days[col]} • {times[row-1]}")
     if not vals: return
-    now = datetime.datetime.now()
+    # Compute the actual datetime corresponding to the calendar cell for the current week
+    today = datetime.date.today()
+    monday = today - datetime.timedelta(days=today.weekday())
+    cell_date = monday + datetime.timedelta(days=(col-1))
+    time_str = times[row-1]
+    hour, minute = map(int, time_str.split(':'))
+    cell_datetime = datetime.datetime(cell_date.year, cell_date.month, cell_date.day, hour, minute)
     note = {
-        "date": now.date().isoformat(),
+        "date": cell_datetime.date().isoformat(),
         "day": days[col],
         "time": times[row-1],
         "type": vals["type"],
         "content": vals["content"],
-        "updated": now.isoformat()
+        "updated": cell_datetime.isoformat(),
+        "mock": True
     }
     if vals.get("title"):  note["title"]  = vals["title"]
     if vals.get("course"): note["course"] = vals["course"]
@@ -257,7 +263,6 @@ def open_notes_system():
     hf = Frame(ns,bg="#fff"); hf.pack(fill="x",padx=20,pady=(20,10))
     Label(hf,text="Notes",font=("Arial",20,"bold"),bg="#fff",fg="#0f172a").pack(side="left")
     ttk.Button(hf,text="+ New Note",command=lambda:add_note_from_notes_window(ns)).pack(side="right")
-    Label(hf,text=datetime.date.today().strftime("%A, %B %d, %Y"),font=("Arial",11),bg="#fff",fg="#475569").pack(anchor="w",pady=(4,0))
 
     # Scrollable area
     cf = Frame(ns,bg="#fff"); cf.pack(fill="both",expand=True)
@@ -289,11 +294,30 @@ def open_notes_system():
         if obj["type"]=="text":
             w = Toplevel(ns); txt=Text(w,wrap="word",width=60,height=18)
             txt.insert("1.0",obj["content"]); txt.config(state="disabled"); txt.pack(fill="both",expand=True)
-        else:
+        elif obj.get("type") == "audio":
+            # Play WAV files via winsound; open other formats with default app
             try:
-                os.startfile(obj["content"]) if os.name=="nt" else os.system(f'xdg-open "{obj["content"]}"')
+                path = obj.get("content")
+                ext = os.path.splitext(path)[1].lower()
+                if ext == ".wav":
+                    winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                else:
+                    # fallback to external player for mp3/others
+                    if os.name == "nt":
+                        os.startfile(path)
+                    else:
+                        os.system(f'xdg-open "{path}"')
             except Exception as e:
-                messagebox.showerror("Error",f"Cannot open file: {e}",parent=ns)
+                messagebox.showerror("Error", f"Cannot play audio: {e}", parent=ns)
+        else:
+            # Open files with default application
+            try:
+                if os.name == "nt":
+                    os.startfile(obj.get("content"))
+                else:
+                    os.system(f'xdg-open "{obj.get("content")}"')
+            except Exception as e:
+                messagebox.showerror("Error", f"Cannot open file: {e}", parent=ns)
 
     def render_card(idx,obj):
         cf = Frame(cards,bg="#fff",highlightthickness=1,highlightbackground="#e2e8f0")
@@ -319,9 +343,19 @@ def open_notes_system():
         title_text = f"{obj.get('title','Untitled')}{icon}"
         Label(cf, text=title_text, font=("Arial",16,"bold"), bg="#fff", fg="#0f172a").pack(anchor="w", padx=20)
         Label(cf,text=obj.get("content",""),font=("Arial",11),bg="#fff",fg="#1f2937",justify="left",wraplength=620).pack(anchor="w",padx=20,pady=(4,12))
-        dt = datetime.datetime.fromisoformat(obj.get("updated")) if obj.get("updated") else None
-        Label(cf,text=(dt.strftime("Updated %d/%m/%Y, %H:%M:%S") if dt else f"Created {obj['date']} {obj['time']}"),
-              font=("Arial",10),bg="#fff",fg="#64748b").pack(anchor="w",padx=20,pady=(0,18))
+        # Show placeholder for calendar-added (mock) notes
+        if obj.get("mock"):
+            # Placeholder for calendar-added notes
+            timestamp = f"Created {obj['day']}, DD/MM/YYYY, {obj['time']}:00"
+        else:
+            # Show updated timestamp for real/manually edited notes
+            dt = datetime.datetime.fromisoformat(obj.get("updated")) if obj.get("updated") else None
+            if dt:
+                timestamp = dt.strftime("Updated %A %d/%m/%Y, %H:%M:%S")
+            else:
+                timestamp = f"Updated {obj['day']}, {obj['date']}, {obj['time']}:00"
+        Label(cf, text=timestamp,
+              font=("Arial",10), bg="#fff", fg="#64748b").pack(anchor="w", padx=20, pady=(0,18))
         for w in cf.winfo_children()+trow.winfo_children():
             w.bind("<Double-Button-1>",lambda e,o=obj: open_item(o))
 
@@ -331,7 +365,13 @@ def open_notes_system():
             Label(cards, text="No notes yet. Click 'New Note' to get started.",
                   font=("Arial",12),bg="#fff",fg="#64748b").pack(pady=60)
         else:
-            for i,obj in sorted(enumerate(notes), key=lambda x: x[1].get("updated",""), reverse=True):
+            # Sort notes: mock calendar notes first, then by updated timestamp desc
+            def sort_key(item):
+                idx, note = item
+                # mock notes get priority
+                priority = 1 if note.get("mock") else 0
+                return (priority, note.get("updated", ""))
+            for i,obj in sorted(enumerate(notes), key=sort_key, reverse=True):
                 render_card(i,obj)
 
     ns.bind("<<NotesUpdated>>",refresh)
