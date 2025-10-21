@@ -1,19 +1,13 @@
-# ONE THING TO CONSIDER IS THE DELETE OF COURSES WHEN THE TRACKER IS OPENED. THIS DOESNOT WORK!!!
-# ANOTHER THING IS THE SPACE ABOVE THE PLANNER WHEN OPENED IN FULL SCREEN
-
 from tkinter import *
 from tkinter import simpledialog, messagebox, colorchooser, filedialog
-import winsound
-import datetime
-import json
-import csv
-import os
-
+import winsound, datetime, json, csv, os
+from tkinter import Toplevel, StringVar, Text, Canvas, Frame, Label, END
+from tkinter import ttk
 
 # --- MAIN WINDOW SETUP ---
 root_window = Tk()
 root_window.title("Weekly Calendar")
-root_window.minsize(700, 500)
+root_window.state('zoomed')
 
 calendar_frame = Frame(root_window)
 calendar_frame.pack(fill="both", expand=True)
@@ -85,13 +79,6 @@ main_frame.pack(fill="both", expand=True)
 # ==========================
 # NOTE SYSTEM (from Program 1, adapted for menu use)
 # ==========================
-
-import datetime, json, csv, os
-from tkinter import Toplevel, StringVar, Text, Canvas, Frame, Label, END
-from tkinter import filedialog, messagebox
-from tkinter import ttk
-
-
 NOTE_ICON = "📝"
 
 def _make_labeled(parent, widget_cls, label, **opts):
@@ -1088,6 +1075,7 @@ def manage_flashcards():
         refresh_list()
         messagebox.showinfo("Success", f"Flashcards successfully imported for {course}.")
         flash_window.destroy()
+
     def edit_flashcard():
         if not course:
             messagebox.showerror("Error", "No course selected.")
@@ -1114,6 +1102,7 @@ def manage_flashcards():
             flashcards_by_course[course].pop(term)
         flashcards_by_course[course][new_term] = new_definition
         refresh_list()
+
     def delete_flashcard():
         if not course:
             messagebox.showerror("Error", "No course selected.")
@@ -1126,6 +1115,7 @@ def manage_flashcards():
         if messagebox.askyesno("Delete", f"Delete flashcard '{term}'?"):
             flashcards_by_course[course].pop(term)
             refresh_list()
+
     btn_frame = Frame(flash_window); btn_frame.pack(pady=10)
     Button(btn_frame, text="Switch Course/Add to existing course", command=switch_course).grid(row=0, column=0, padx=5)
     Button(btn_frame, text="Add", width=10, command=add_flashcard).grid(row=0, column=1, padx=5)
@@ -1136,6 +1126,7 @@ def manage_flashcards():
     if not course:
         flash_window.destroy()
         return
+    Label(flash_window, text=f"Course: {course}", font=("Arial", 12)).pack(pady=5)
     refresh_list()
 
 def start_quiz():
@@ -1457,6 +1448,7 @@ def setup_menu():
     study_menu.add_command(label="Open Planner", command=study_planner)
     menubar.add_cascade(label="Study Planner", menu=study_menu)
     study_menu.add_separator()
+    study_menu.add_command(label="Exit", command=root_window.quit)
 
     # --- Course Hour Tracker Menu ---
     tracker_menu = Menu(menubar, tearoff=0)
@@ -1486,11 +1478,4 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
-
-
-
-
-
-
-
 
