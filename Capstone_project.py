@@ -26,6 +26,8 @@ courses = {}           # Stores course names and colors
 course_colors = {}     # Stores color for each course
 tracked_hours = {}     # Stores accumulated Pomodoro study time per course
 flashcards_by_course = {} # Stores the flashcards per course
+current_course_window = None # Keeps track of whether a course selection window is already open
+current_pomodoro_window = None  # Track the currently open Pomodoro timer window
 
 # --- DEFAULT COURSES AT STARTUP ---
 default_courses = ["Math", "History", "Biology"]
@@ -573,9 +575,16 @@ def ask_for_course():
     Opens a small pop-up window that allows the user to choose a course.
     Returns the name of the course that the user selects.
     """
+    global current_course_window
+
+    # Close existing window if one is open
+    if current_course_window and current_course_window.winfo_exists():
+        current_course_window.destroy()
+        current_course_window = None
 
     # Create a new pop-up window on top of the main application
     course_selection = Toplevel(root_window)  # Toplevel creates a new window
+    current_course_window = course_selection  # Update global reference
     course_selection.title("Select Course")   # Set the title of the window
     course_selection.geometry("300x200")      # Set the size of the window (width x height)
 
@@ -592,6 +601,8 @@ def ask_for_course():
         """
         selected_course["name"] = name       # Save the selected course name
         course_selection.destroy()           # Close the pop-up window
+        global current_course_window
+        current_course_window = None         # Window is closed
 
     # Create a button for each course in the courses list
     for course_name in courses.keys():
@@ -1286,10 +1297,28 @@ def pomodoro_timer(selected_course=None, count_hours=True):
     Pomodoro Timer: 25 minutes study / 5 minutes break.
     Tracks hours for each course if selected.
     """
+    global current_pomodoro_window
 
     # Set Pomodoro and break durations
     pomodoro_time = 0.25  # Minutes
     break_time = 0.5      # Minutes
+
+    # Check if a timer is already running
+    if current_pomodoro_window and current_pomodoro_window.winfo_exists():
+        response = messagebox.askyesno(
+            "Pomodoro Timer Already Running",
+            "There is already a Pomodoro timer running.\n"
+            "Do you want to close the current timer and start a new one?\n"
+            "Yes = Start new timer\nNo = Keep existing timer"
+        )
+        if not response:
+            # Bring the existing timer to front
+            current_pomodoro_window.lift()
+            return
+        else:
+            # Close the existing timer
+            current_pomodoro_window.destroy()
+            current_pomodoro_window = None
 
     # Ask user to select a course if none is provided
     if not selected_course:
@@ -1320,12 +1349,13 @@ def pomodoro_timer(selected_course=None, count_hours=True):
         if not selected_course:
             return  # User cancelled selection
 
-    # 🟢 Create a new popup window for the timer
+    # Create a popup window for the timer
     pomodoro_window = Toplevel(root_window)
+    current_pomodoro_window = pomodoro_window
     pomodoro_window.title("Pomodoro Timer")
     pomodoro_window.geometry("350x450")
 
-    # Use a new frame inside the popup instead of the main window
+    # Use a frame inside the popup
     pomodoro_frame = Frame(pomodoro_window)
     pomodoro_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -1347,6 +1377,14 @@ def pomodoro_timer(selected_course=None, count_hours=True):
 
     status_label = Label(pomodoro_frame, text="Status: Ready to start", font=("Arial", 12))
     status_label.pack(pady=10)
+
+    # Ensure that when the window is destroyed, you reset the global reference:
+    def on_close():
+        global current_pomodoro_window
+        current_pomodoro_window = None
+        pomodoro_window.destroy()
+
+    pomodoro_window.protocol("WM_DELETE_WINDOW", on_close) #If user closes window with X, the on_close() function will run
 
     # Internal state variables
     is_running = {"value": False}       # Is the timer currently running?
