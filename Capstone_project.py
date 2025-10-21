@@ -191,13 +191,23 @@ def save_notes_csv():
     if not notes:
         return messagebox.showwarning("No Notes","No notes to save.")
     path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
-    if not path: return
-    keys = ["date","day","time","type","content"]
-    with open(path,"w",newline="",encoding="utf-8") as f:
-        writer = csv.DictWriter(f,fieldnames=keys)
+    if not path:
+        return
+    # Export CSV with columns: date, day, course, type, content
+    keys = ["date","day","course","type","content"]
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
-        writer.writerows(notes)
-    messagebox.showinfo("Saved",f"Notes saved to {path}")
+        for note in notes:
+            row = {
+                "date": note.get("date", ""),
+                "day": note.get("day", ""),
+                "course": note.get("course") or "General",
+                "type": note.get("type", ""),
+                "content": note.get("content", "")
+            }
+            writer.writerow(row)
+    messagebox.showinfo("Saved", f"Notes saved to {path}")
 
 def add_note_from_cell(row,col):
     vals = launch_note_editor(root_window, courses_list=list(courses.keys()),
@@ -1537,4 +1547,5 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
