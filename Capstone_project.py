@@ -1,3 +1,4 @@
+# --- IMPORT ---
 from tkinter import *
 from tkinter import simpledialog, messagebox, colorchooser, filedialog
 import winsound, datetime, json, csv, os
@@ -24,7 +25,7 @@ sessions = {}          # Stores scheduled study sessions
 courses = {}           # Stores course names and colors
 course_colors = {}     # Stores color for each course
 tracked_hours = {}     # Stores accumulated Pomodoro study time per course
-flashcards_by_course = {}
+flashcards_by_course = {} # Stores the flashcards per course
 
 # --- DEFAULT COURSES AT STARTUP ---
 default_courses = ["Math", "History", "Biology"]
@@ -352,7 +353,6 @@ def create_table():
             cell.bind("<Button-1>", lambda e, r=row, c=col: click_on_cell(r, c))
             cell.bind("<Button-3>", lambda e, r=row, c=col: show_cell_menu(e, r, c))
 
-
             cells[(row, col)] = cell
 
     # Ensures that sessions remain saved when a different menu is used.
@@ -598,6 +598,24 @@ def ask_for_course():
         # When a button is clicked, call 'select_course' with the course's name
         Button(course_selection, text=course_name, width=20,
                command=lambda n=course_name: select_course(n)).pack(pady=2)
+    # Add now course
+    def create_new_course():
+        new_course = simpledialog.askstring(
+            "New Course Name",
+            "Enter new course name:",
+            parent=course_selection
+        )
+        if new_course:
+            new_course = new_course.strip()
+            if new_course:
+                if new_course not in courses:
+                    courses[new_course] = {"tasks": [], "notes": [], "sessions": []}
+                selected_course["name"] = new_course
+                course_selection.destroy()
+            else:
+                messagebox.showerror("Error", "Course name cannot be empty.")
+
+    Button(course_selection, text="Create New Course", width=25, command=create_new_course).pack(pady=10)
 
     # Pause the program here until the user closes the pop-up
     course_selection.wait_window()
@@ -611,7 +629,6 @@ def ask_for_course():
 
     # Otherwise, return the name of the selected course
     return selected_course["name"]
-
 
 # -----------------------------------------
 #  FUNCTION: Edit or delete a study session
@@ -769,6 +786,10 @@ def manage_courses():
             # Add the updated one
             courses[new_name] = color
             course_colors[new_name] = color
+
+            # Update tracked_hours
+            if old_name in tracked_hours:
+                tracked_hours[new_name] = tracked_hours.pop(old_name)
 
         # Update all existing sessions in the calendar that use this course
         for key, info in sessions.items():
