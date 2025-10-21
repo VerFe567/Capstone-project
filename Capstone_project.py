@@ -79,376 +79,6 @@ notes = [
 main_frame = Frame(root_window)
 main_frame.pack(fill="both", expand=True)
 
-# ==========================
-# NOTE SYSTEM 
-# ==========================
-
-def _make_labeled(parent, widget_cls, label, **opts):
-    frm = ttk.Frame(parent)
-    frm.pack(fill="x", padx=20, pady=5)
-    ttk.Label(frm, text=label).pack(side="left")
-    w = widget_cls(frm, **opts)
-    w.pack(side="left", fill="x", expand=True, padx=(5,0))
-    return w
-
-#Note system - requirement 3.2: enables adding text notes.
-def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New Note", subtitle_text=None):
-    data = note.copy() if note else {}
-    editor = Toplevel(parent)
-    editor.title(title_text); editor.transient(parent); editor.grab_set()
-
-    # Header
-    ttk.Label(editor, text=title_text, font=("Arial",12,"bold")).pack(pady=(12,4))
-    if subtitle_text:
-        ttk.Label(editor, text=subtitle_text, font=("Arial",10)).pack(pady=(0,8))
-
-    # Course dropdown first
-    opts = ["General"] + [c for c in (courses_list or []) if c!="General"]
-    if data.get("course") and data["course"] not in opts:
-        opts.append(data["course"])
-    course_var = StringVar(value=data.get("course") or "General")
-    _make_labeled(editor, ttk.Combobox, "Course:", textvariable=course_var,
-                 values=opts, state="readonly", width=25)
-
-    # Title entry
-    title_entry = _make_labeled(editor, ttk.Entry, "Title:")
-    if data.get("title"):
-        title_entry.insert(0, data["title"])
-
-    # Description text box
-    desc_frame = ttk.Frame(editor)
-    ttk.Label(desc_frame, text="Description:").pack(anchor="w", padx=20, pady=(5,0))
-    content_txt = Text(desc_frame, wrap="word", height=8)
-    content_txt.pack(fill="both", expand=True, padx=20, pady=(0,5))
-    if data.get("content") and data.get("type","text")=="text":
-        content_txt.insert("1.0", data["content"])
-    desc_frame.pack(fill="both", expand=True)
-
-#note system - requirement 3.3: enable import files 
-    # Attachment buttons: audio and file
-    attachment_var = StringVar(value=(data.get("content") if data.get("type") in ["file","audio"] else ""))
-    attachment_type = StringVar(value=(data.get("type") if data.get("type") in ["file","audio"] else ""))
-    attach_frame = ttk.Frame(editor)
-    attach_frame.pack(fill="x", padx=20, pady=5)
-    def browse_file():
-        path = filedialog.askopenfilename()
-        if path:
-            attachment_var.set(path)
-            attachment_type.set("file")
-#note system - bonus point 1: enable import audio 
-    def browse_audio():
-        path = filedialog.askopenfilename(filetypes=[("Audio Files","*.mp3 *.wav *.ogg")])
-        if path:
-            attachment_var.set(path)
-            attachment_type.set("audio")
-    # Audio icon button
-    ttk.Button(attach_frame, text="🎤", width=3, command=browse_audio).pack(side="left", padx=(0,10))
-    # File icon button
-    ttk.Button(attach_frame, text="📁", width=3, command=browse_file).pack(side="left", padx=(0,10))
-    ttk.Label(attach_frame, textvariable=attachment_var).pack(side="left", fill="x", expand=True)
-
-    res = {}
-    def _save():
-        # Gather input values
-        t = title_entry.get().strip()
-        desc = content_txt.get("1.0",END).strip()
-        attach = attachment_var.get().strip()
-        # Require at least title or content (desc or attachment)
-        if not t and not desc and not attach:
-            messagebox.showerror("Missing Info","Enter title or content.",parent=editor)
-            return
-        # Determine note type and content
-        if attach:
-            nt = attachment_type.get() or 'file'
-            content_val = attach
-        else:
-            nt = 'text'
-            content_val = desc
-        # Build result
-        res['value'] = {
-            "title": t,
-            "content": content_val,
-            "course": None if course_var.get()=="General" else course_var.get(),
-            "type": nt
-        }
-        editor.destroy()
-
-    btnf = ttk.Frame(editor)
-    btnf.pack(pady=12)
-    ttk.Button(btnf, text="Save",   command=_save).pack(side="left", padx=5)
-    ttk.Button(btnf, text="Cancel", command=editor.destroy).pack(side="left", padx=5)
-    editor.wait_window()
-    return res.get("value")
-
-#note system - bonus point 2: save note to json/csv
-def save_notes_json():
-    if not notes:
-        return messagebox.showwarning("No Notes","No notes to save.")
-    path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON","*.json")])
-    if not path: return
-    with open(path,"w",encoding="utf-8") as f:
-        json.dump(notes,f,indent=4,ensure_ascii=False)
-    messagebox.showinfo("Saved",f"Notes saved to {path}")
-
-def save_notes_csv():
-    if not notes:
-        return messagebox.showwarning("No Notes","No notes to save.")
-    path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
-    if not path:
-        return
-    # Export CSV with columns: date, day, course, type, content
-    keys = ["date","day","course","type","content"]
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
-        for note in notes:
-            row = {
-                "date": note.get("date", ""),
-                "day": note.get("day", ""),
-                "course": note.get("course") or "General",
-                "type": note.get("type", ""),
-                "content": note.get("content", "")
-            }
-            writer.writerow(row)
-    messagebox.showinfo("Saved", f"Notes saved to {path}")
-
-# Notes system - Requirement 3.1: binds with a session, course, or day.
-def add_note_from_cell(row,col):
-    vals = launch_note_editor(root_window, courses_list=list(courses.keys()),
-                              title_text="New Note",
-                              subtitle_text=f"{days[col]} • {times[row-1]}")
-    if not vals: return
-    # Compute the actual datetime corresponding to the calendar cell for the current week
-    today = datetime.date.today()
-    monday = today - datetime.timedelta(days=today.weekday())
-    cell_date = monday + datetime.timedelta(days=(col-1))
-    time_str = times[row-1]
-    hour, minute = map(int, time_str.split(':'))
-    cell_datetime = datetime.datetime(cell_date.year, cell_date.month, cell_date.day, hour, minute)
-    note = {
-        "date": cell_datetime.date().isoformat(),
-        "day": days[col],
-        "time": times[row-1],
-        "type": vals["type"],
-        "content": vals["content"],
-        "updated": cell_datetime.isoformat(),
-        "mock": True
-    }
-    if vals.get("title"):  note["title"]  = vals["title"]
-    if vals.get("course"): note["course"] = vals["course"]
-    notes.append(note)
-    messagebox.showinfo("Note Added",f"Note added for {note['day']} at {note['time']}.")
-    root_window.event_generate("<<NotesUpdated>>")
-
-def add_note_from_notes_window(parent, note_index=None):
-    note = notes[note_index] if note_index is not None and 0<=note_index<len(notes) else None
-    vals = launch_note_editor(parent, note=note, courses_list=list(courses.keys()), title_text="Edit Note" if note else "New Note")
-    if not vals: return
-    now = datetime.datetime.now()
-    new = {
-        "date": note["date"] if note else now.date().isoformat(),
-        "day":  note["day"]  if note else now.strftime("%A"),
-        "time": note["time"] if note else now.strftime("%H:%M"),
-        "type": note["type"] if note else "text",
-        "content": vals["content"],
-        "updated": now.isoformat()
-    }
-    if vals.get("title"):  new["title"]  = vals["title"]
-    if vals.get("course"): new["course"] = vals["course"]
-    if note_index is None or note is None:
-        notes.append(new)
-    else:
-        notes[note_index] = new
-    parent.event_generate("<<NotesUpdated>>")
-
-def open_notes_system():
-    ns = Toplevel(root_window); ns.title("Notes"); ns.geometry("720x520")
-    ns.configure(bg="#fff")
-    # Header
-    hf = Frame(ns,bg="#fff"); hf.pack(fill="x",padx=20,pady=(20,10))
-    Label(hf,text="Notes",font=("Arial",20,"bold"),bg="#fff",fg="#0f172a").pack(side="left")
-    ttk.Button(hf,text="+ New Note",command=lambda:add_note_from_notes_window(ns)).pack(side="right")
-
-    # Scrollable area
-    cf = Frame(ns,bg="#fff"); cf.pack(fill="both",expand=True)
-    canvas = Canvas(cf,bg="#fff",highlightthickness=0)
-    sb = ttk.Scrollbar(cf,orient="vertical",command=canvas.yview)
-    canvas.configure(yscrollcommand=sb.set)
-    sb.pack(side="right",fill="y"); canvas.pack(side="left",fill="both",expand=True)
-    cards = Frame(canvas,bg="#fff")
-    win = canvas.create_window((0,0),window=cards,anchor="nw")
-    cards.bind("<Configure>",lambda e:canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.bind("<Configure>", lambda e: canvas.itemconfig(win, width=e.width))
-    canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", lambda ev: canvas.yview_scroll(-int(ev.delta/120), "units")))
-    canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
-
-    # Footer buttons
-    ff = Frame(ns,bg="#fff"); ff.pack(fill="x",padx=20,pady=10)
-    ttk.Button(ff,text="Save JSON",command=save_notes_json).pack(side="left",padx=(0,10))
-    ttk.Button(ff,text="Save CSV", command=save_notes_csv).pack(side="left",padx=(0,10))
-    ttk.Button(ff,text="Close",     command=ns.destroy).pack(side="right")
-
-    def badge_colors(name):
-        bg = course_colors.get(name,"#0ea5e9") if name else "#0ea5e9"
-        r,g,b = ns.winfo_rgb(bg)
-        bright = (0.299*r+0.587*g+0.114*b)/65535
-        fg = "#0f172a" if bright>0.75 else "#fff"
-        return bg, fg
-
-    def open_item(obj):
-        if obj["type"]=="text":
-            w = Toplevel(ns); txt=Text(w,wrap="word",width=60,height=18)
-            txt.insert("1.0",obj["content"]); txt.config(state="disabled"); txt.pack(fill="both",expand=True)
-        elif obj.get("type") == "audio":
-            # Play WAV files via winsound; open other formats with default app
-            try:
-                path = obj.get("content")
-                ext = os.path.splitext(path)[1].lower()
-                if ext == ".wav":
-                    winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
-                else:
-                    # fallback to external player for mp3/others
-                    if os.name == "nt":
-                        os.startfile(path)
-                    else:
-                        os.system(f'xdg-open "{path}"')
-            except Exception as e:
-                messagebox.showerror("Error", f"Cannot play audio: {e}", parent=ns)
-        else:
-            # Open files with default application
-            try:
-                if os.name == "nt":
-                    os.startfile(obj.get("content"))
-                else:
-                    os.system(f'xdg-open "{obj.get("content")}"')
-            except Exception as e:
-                messagebox.showerror("Error", f"Cannot open file: {e}", parent=ns)
-
-    def render_card(idx,obj):
-        cf = Frame(cards,bg="#fff",highlightthickness=1,highlightbackground="#e2e8f0")
-        cf.pack(fill="x",padx=20,pady=10)
-        trow = Frame(cf,bg="#fff"); trow.pack(fill="x",padx=20,pady=(18,6))
-        bg,fg = badge_colors(obj.get("course"))
-        Label(trow,text=obj.get("course") or "General",bg=bg,fg=fg,font=("Arial",10,"bold"),padx=10,pady=4).pack(side="left")
-        act = Frame(trow,bg="#fff"); act.pack(side="right")
-        ttk.Button(act,text="Edit",  width=6, command=lambda i=idx:add_note_from_notes_window(ns,i)).pack(side="left",padx=(0,6))
-        ttk.Button(act,text="Delete",width=6, command=lambda i=idx:(notes.pop(i),ns.event_generate("<<NotesUpdated>>"))).pack(side="left")
-
-        # Compute icon for attachment type
-        icon = ""
-        if obj.get("type") == "audio":
-            icon = " 🎤"
-        elif obj.get("type") == "file":
-            # Show image icon for common image extensions
-            ext = os.path.splitext(obj.get("content",""))[1].lower()
-            if ext in [".png",".jpg",".jpeg",".gif",".bmp"]:
-                icon = " 🖼️"
-            else:
-                icon = " 📁"
-        title_text = f"{obj.get('title','Untitled')}{icon}"
-        Label(cf, text=title_text, font=("Arial",16,"bold"), bg="#fff", fg="#0f172a").pack(anchor="w", padx=20)
-        Label(cf,text=obj.get("content",""),font=("Arial",11),bg="#fff",fg="#1f2937",justify="left",wraplength=620).pack(anchor="w",padx=20,pady=(4,12))
-        # Show placeholder for calendar-added (mock) notes
-        if obj.get("mock"):
-            # Placeholder for calendar-added notes
-            timestamp = f"Created {obj['day']}, DD/MM/YYYY, {obj['time']}:00"
-        else:
-            # Show updated timestamp for real/manually edited notes
-            dt = datetime.datetime.fromisoformat(obj.get("updated")) if obj.get("updated") else None
-            if dt:
-                timestamp = dt.strftime("Updated %A %d/%m/%Y, %H:%M:%S")
-            else:
-                timestamp = f"Updated {obj['day']}, {obj['date']}, {obj['time']}:00"
-        Label(cf, text=timestamp,
-              font=("Arial",10), bg="#fff", fg="#64748b").pack(anchor="w", padx=20, pady=(0,18))
-        for w in cf.winfo_children()+trow.winfo_children():
-            w.bind("<Double-Button-1>",lambda e,o=obj: open_item(o))
-
-    def refresh(_=None):
-        for w in cards.winfo_children(): w.destroy()
-        if not notes:
-            Label(cards, text="No notes yet. Click 'New Note' to get started.",
-                  font=("Arial",12),bg="#fff",fg="#64748b").pack(pady=60)
-        else:
-            # Sort notes: mock calendar notes first, then by updated timestamp desc
-            def sort_key(item):
-                idx, note = item
-                # mock notes get priority
-                priority = 1 if note.get("mock") else 0
-                return (priority, note.get("updated", ""))
-            for i,obj in sorted(enumerate(notes), key=sort_key, reverse=True):
-                render_card(i,obj)
-
-    ns.bind("<<NotesUpdated>>",refresh)
-    refresh()
-# ==========================
-# End Note System
-# ==========================
-
-# -----------------------------------------
-#  FUNCTION: Create the table
-# -----------------------------------------
-def create_table():
-    """Creates the calendar grid with days and time slots (reuses existing data if available)"""
-    for col, day in enumerate(days):
-        header = Label(calendar_frame, text=day, font=("Arial", 11), borderwidth=1,
-                       relief="solid", width=15, bg="lightblue")
-        header.grid(row=0, column=col, sticky="nsew")
-
-    for row, time in enumerate(times, start=1):
-        # Time labels
-        time_label = Label(calendar_frame, text=time, font=("Arial", 11),
-                           borderwidth=1, relief="solid", width=15)
-        time_label.grid(row=row, column=0, sticky="nsew")
-
-        for col in range(1, len(days)):
-            cell = Label(calendar_frame, text="", font=("Arial", 11),
-                         borderwidth=1, relief="solid", width=15)
-            cell.grid(row=row, column=col, sticky="nsew")
-
-            # Bind click actions
-            cell.bind("<Button-1>", lambda e, r=row, c=col: click_on_cell(r, c))
-            cell.bind("<Button-3>", lambda e, r=row, c=col: show_cell_menu(e, r, c))
-
-            cells[(row, col)] = cell
-
-    # Ensures that sessions remain saved when a different menu is used.
-    for key, info in sessions.items():
-        row, col = key
-        cell = cells.get(key)
-        if cell: # only top cell of a session should show text
-            course = info["course"]
-            color = info["color"]
-
-            # Find the cell directly above the current cell
-            above_key = (row - 1, col)
-
-            # Check if the cell above exists and belongs to the same course
-            if above_key in sessions:
-                if sessions[above_key]["course"] == course:
-                    # The cell above is part of the same session
-                    is_top_cell = False
-                else:
-                    # The cell above is a different course
-                    is_top_cell = True
-            else:
-                # There is no session in the cell above
-                is_top_cell = True
-
-            # Update the current cell
-            if is_top_cell:
-                # Show the course name only in the top cell of the session
-                cell.config(text=course, bg=color)
-            else:
-                # Leave the text empty in lower cells, but keep the background color
-                cell.config(text="", bg=color)
-
-    # Make grid responsive
-    for d in range(len(days)):
-        calendar_frame.grid_columnconfigure(d, weight=1)
-    for t in range(len(times) + 1):
-        calendar_frame.grid_rowconfigure(t, weight=1)
-
 # -----------------------------------------
 #  FUNCTION: Show Instructions
 # -----------------------------------------
@@ -516,6 +146,70 @@ Focus effectively using the Pomodoro system (25 min study + 5 min break).
     text_box.pack(fill="both", expand=True, padx=10, pady=5)
 
     Button(main_frame, text="Open Study Planner", command=study_planner, bg="lightblue").pack(pady=10)
+
+# -----------------------------------------
+#  FUNCTION: Create the table
+# -----------------------------------------
+def create_table():
+    """Creates the calendar grid with days and time slots (reuses existing data if available)"""
+    for col, day in enumerate(days):
+        header = Label(calendar_frame, text=day, font=("Arial", 11), borderwidth=1,
+                       relief="solid", width=15, bg="lightblue")
+        header.grid(row=0, column=col, sticky="nsew")
+
+    for row, time in enumerate(times, start=1):
+        # Time labels
+        time_label = Label(calendar_frame, text=time, font=("Arial", 11),
+                           borderwidth=1, relief="solid", width=15)
+        time_label.grid(row=row, column=0, sticky="nsew")
+
+        for col in range(1, len(days)):
+            cell = Label(calendar_frame, text="", font=("Arial", 11),
+                         borderwidth=1, relief="solid", width=15)
+            cell.grid(row=row, column=col, sticky="nsew")
+
+            # Bind click actions
+            cell.bind("<Button-1>", lambda e, r=row, c=col: click_on_cell(r, c))
+            cell.bind("<Button-3>", lambda e, r=row, c=col: show_cell_menu(e, r, c))
+
+            cells[(row, col)] = cell
+
+    # Ensures that sessions remain saved when a different menu is used.
+    for key, info in sessions.items():
+        row, col = key
+        cell = cells.get(key)
+        if cell: # only top cell of a session should show text
+            course = info["course"]
+            color = info["color"]
+
+            # Find the cell directly above the current cell
+            above_key = (row - 1, col)
+
+            # Check if the cell above exists and belongs to the same course
+            if above_key in sessions:
+                if sessions[above_key]["course"] == course:
+                    # The cell above is part of the same session
+                    is_top_cell = False
+                else:
+                    # The cell above is a different course
+                    is_top_cell = True
+            else:
+                # There is no session in the cell above
+                is_top_cell = True
+
+            # Update the current cell
+            if is_top_cell:
+                # Show the course name only in the top cell of the session
+                cell.config(text=course, bg=color)
+            else:
+                # Leave the text empty in lower cells, but keep the background color
+                cell.config(text="", bg=color)
+
+    # Make grid responsive
+    for d in range(len(days)):
+        calendar_frame.grid_columnconfigure(d, weight=1)
+    for t in range(len(times) + 1):
+        calendar_frame.grid_rowconfigure(t, weight=1)
 
 # -----------------------------------------
 #  FUNCTION: Show Study Planner
@@ -1066,6 +760,309 @@ def course_tracker():
     # Add the button to the main window
     Button(main_frame, text="Add Study Hours", width=20, bg="lightgreen", command=add_study_hours).pack(pady=10)
 
+# --------------------------
+# NOTE SYSTEM
+# --------------------------
+
+def _make_labeled(parent, widget_cls, label, **opts):
+    frm = ttk.Frame(parent)
+    frm.pack(fill="x", padx=20, pady=5)
+    ttk.Label(frm, text=label).pack(side="left")
+    w = widget_cls(frm, **opts)
+    w.pack(side="left", fill="x", expand=True, padx=(5,0))
+    return w
+
+#Note system - requirement 3.2: enables adding text notes.
+def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New Note", subtitle_text=None):
+    data = note.copy() if note else {}
+    editor = Toplevel(parent)
+    editor.title(title_text); editor.transient(parent); editor.grab_set()
+
+    # Header
+    ttk.Label(editor, text=title_text, font=("Arial",12,"bold")).pack(pady=(12,4))
+    if subtitle_text:
+        ttk.Label(editor, text=subtitle_text, font=("Arial",10)).pack(pady=(0,8))
+
+    # Course dropdown first
+    opts = ["General"] + [c for c in (courses_list or []) if c!="General"]
+    if data.get("course") and data["course"] not in opts:
+        opts.append(data["course"])
+    course_var = StringVar(value=data.get("course") or "General")
+    _make_labeled(editor, ttk.Combobox, "Course:", textvariable=course_var,
+                 values=opts, state="readonly", width=25)
+
+    # Title entry
+    title_entry = _make_labeled(editor, ttk.Entry, "Title:")
+    if data.get("title"):
+        title_entry.insert(0, data["title"])
+
+    # Description text box
+    desc_frame = ttk.Frame(editor)
+    ttk.Label(desc_frame, text="Description:").pack(anchor="w", padx=20, pady=(5,0))
+    content_txt = Text(desc_frame, wrap="word", height=8)
+    content_txt.pack(fill="both", expand=True, padx=20, pady=(0,5))
+    if data.get("content") and data.get("type","text")=="text":
+        content_txt.insert("1.0", data["content"])
+    desc_frame.pack(fill="both", expand=True)
+
+#note system - requirement 3.3: enable import files
+    # Attachment buttons: audio and file
+    attachment_var = StringVar(value=(data.get("content") if data.get("type") in ["file","audio"] else ""))
+    attachment_type = StringVar(value=(data.get("type") if data.get("type") in ["file","audio"] else ""))
+    attach_frame = ttk.Frame(editor)
+    attach_frame.pack(fill="x", padx=20, pady=5)
+    def browse_file():
+        path = filedialog.askopenfilename()
+        if path:
+            attachment_var.set(path)
+            attachment_type.set("file")
+#note system - bonus point 1: enable import audio
+    def browse_audio():
+        path = filedialog.askopenfilename(filetypes=[("Audio Files","*.mp3 *.wav *.ogg")])
+        if path:
+            attachment_var.set(path)
+            attachment_type.set("audio")
+    # Audio icon button
+    ttk.Button(attach_frame, text="🎤", width=3, command=browse_audio).pack(side="left", padx=(0,10))
+    # File icon button
+    ttk.Button(attach_frame, text="📁", width=3, command=browse_file).pack(side="left", padx=(0,10))
+    ttk.Label(attach_frame, textvariable=attachment_var).pack(side="left", fill="x", expand=True)
+
+    res = {}
+    def _save():
+        # Gather input values
+        t = title_entry.get().strip()
+        desc = content_txt.get("1.0",END).strip()
+        attach = attachment_var.get().strip()
+        # Require at least title or content (desc or attachment)
+        if not t and not desc and not attach:
+            messagebox.showerror("Missing Info","Enter title or content.",parent=editor)
+            return
+        # Determine note type and content
+        if attach:
+            nt = attachment_type.get() or 'file'
+            content_val = attach
+        else:
+            nt = 'text'
+            content_val = desc
+        # Build result
+        res['value'] = {
+            "title": t,
+            "content": content_val,
+            "course": None if course_var.get()=="General" else course_var.get(),
+            "type": nt
+        }
+        editor.destroy()
+
+    btnf = ttk.Frame(editor)
+    btnf.pack(pady=12)
+    ttk.Button(btnf, text="Save",   command=_save).pack(side="left", padx=5)
+    ttk.Button(btnf, text="Cancel", command=editor.destroy).pack(side="left", padx=5)
+    editor.wait_window()
+    return res.get("value")
+
+#note system - bonus point 2: save note to json/csv
+def save_notes_json():
+    if not notes:
+        return messagebox.showwarning("No Notes","No notes to save.")
+    path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON","*.json")])
+    if not path: return
+    with open(path,"w",encoding="utf-8") as f:
+        json.dump(notes,f,indent=4,ensure_ascii=False)
+    messagebox.showinfo("Saved",f"Notes saved to {path}")
+
+def save_notes_csv():
+    if not notes:
+        return messagebox.showwarning("No Notes","No notes to save.")
+    path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
+    if not path:
+        return
+    # Export CSV with columns: date, day, course, type, content
+    keys = ["date","day","course","type","content"]
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        for note in notes:
+            row = {
+                "date": note.get("date", ""),
+                "day": note.get("day", ""),
+                "course": note.get("course") or "General",
+                "type": note.get("type", ""),
+                "content": note.get("content", "")
+            }
+            writer.writerow(row)
+    messagebox.showinfo("Saved", f"Notes saved to {path}")
+
+# Notes system - Requirement 3.1: binds with a session, course, or day.
+def add_note_from_cell(row,col):
+    vals = launch_note_editor(root_window, courses_list=list(courses.keys()),
+                              title_text="New Note",
+                              subtitle_text=f"{days[col]} • {times[row-1]}")
+    if not vals: return
+    # Compute the actual datetime corresponding to the calendar cell for the current week
+    today = datetime.date.today()
+    monday = today - datetime.timedelta(days=today.weekday())
+    cell_date = monday + datetime.timedelta(days=(col-1))
+    time_str = times[row-1]
+    hour, minute = map(int, time_str.split(':'))
+    cell_datetime = datetime.datetime(cell_date.year, cell_date.month, cell_date.day, hour, minute)
+    note = {
+        "date": cell_datetime.date().isoformat(),
+        "day": days[col],
+        "time": times[row-1],
+        "type": vals["type"],
+        "content": vals["content"],
+        "updated": cell_datetime.isoformat(),
+        "mock": True
+    }
+    if vals.get("title"):  note["title"]  = vals["title"]
+    if vals.get("course"): note["course"] = vals["course"]
+    notes.append(note)
+    messagebox.showinfo("Note Added",f"Note added for {note['day']} at {note['time']}.")
+    root_window.event_generate("<<NotesUpdated>>")
+
+def add_note_from_notes_window(parent, note_index=None):
+    note = notes[note_index] if note_index is not None and 0<=note_index<len(notes) else None
+    vals = launch_note_editor(parent, note=note, courses_list=list(courses.keys()), title_text="Edit Note" if note else "New Note")
+    if not vals: return
+    now = datetime.datetime.now()
+    new = {
+        "date": note["date"] if note else now.date().isoformat(),
+        "day":  note["day"]  if note else now.strftime("%A"),
+        "time": note["time"] if note else now.strftime("%H:%M"),
+        "type": note["type"] if note else "text",
+        "content": vals["content"],
+        "updated": now.isoformat()
+    }
+    if vals.get("title"):  new["title"]  = vals["title"]
+    if vals.get("course"): new["course"] = vals["course"]
+    if note_index is None or note is None:
+        notes.append(new)
+    else:
+        notes[note_index] = new
+    parent.event_generate("<<NotesUpdated>>")
+
+def open_notes_system():
+    ns = Toplevel(root_window); ns.title("Notes"); ns.geometry("720x520")
+    ns.configure(bg="#fff")
+    # Header
+    hf = Frame(ns,bg="#fff"); hf.pack(fill="x",padx=20,pady=(20,10))
+    Label(hf,text="Notes",font=("Arial",20,"bold"),bg="#fff",fg="#0f172a").pack(side="left")
+    ttk.Button(hf,text="+ New Note",command=lambda:add_note_from_notes_window(ns)).pack(side="right")
+
+    # Scrollable area
+    cf = Frame(ns,bg="#fff"); cf.pack(fill="both",expand=True)
+    canvas = Canvas(cf,bg="#fff",highlightthickness=0)
+    sb = ttk.Scrollbar(cf,orient="vertical",command=canvas.yview)
+    canvas.configure(yscrollcommand=sb.set)
+    sb.pack(side="right",fill="y"); canvas.pack(side="left",fill="both",expand=True)
+    cards = Frame(canvas,bg="#fff")
+    win = canvas.create_window((0,0),window=cards,anchor="nw")
+    cards.bind("<Configure>",lambda e:canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.bind("<Configure>", lambda e: canvas.itemconfig(win, width=e.width))
+    canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", lambda ev: canvas.yview_scroll(-int(ev.delta/120), "units")))
+    canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+
+    # Footer buttons
+    ff = Frame(ns,bg="#fff"); ff.pack(fill="x",padx=20,pady=10)
+    ttk.Button(ff,text="Save JSON",command=save_notes_json).pack(side="left",padx=(0,10))
+    ttk.Button(ff,text="Save CSV", command=save_notes_csv).pack(side="left",padx=(0,10))
+    ttk.Button(ff,text="Close",     command=ns.destroy).pack(side="right")
+
+    def badge_colors(name):
+        bg = course_colors.get(name,"#0ea5e9") if name else "#0ea5e9"
+        r,g,b = ns.winfo_rgb(bg)
+        bright = (0.299*r+0.587*g+0.114*b)/65535
+        fg = "#0f172a" if bright>0.75 else "#fff"
+        return bg, fg
+
+    def open_item(obj):
+        if obj["type"]=="text":
+            w = Toplevel(ns); txt=Text(w,wrap="word",width=60,height=18)
+            txt.insert("1.0",obj["content"]); txt.config(state="disabled"); txt.pack(fill="both",expand=True)
+        elif obj.get("type") == "audio":
+            # Play WAV files via winsound; open other formats with default app
+            try:
+                path = obj.get("content")
+                ext = os.path.splitext(path)[1].lower()
+                if ext == ".wav":
+                    winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                else:
+                    # fallback to external player for mp3/others
+                    if os.name == "nt":
+                        os.startfile(path)
+                    else:
+                        os.system(f'xdg-open "{path}"')
+            except Exception as e:
+                messagebox.showerror("Error", f"Cannot play audio: {e}", parent=ns)
+        else:
+            # Open files with default application
+            try:
+                if os.name == "nt":
+                    os.startfile(obj.get("content"))
+                else:
+                    os.system(f'xdg-open "{obj.get("content")}"')
+            except Exception as e:
+                messagebox.showerror("Error", f"Cannot open file: {e}", parent=ns)
+
+    def render_card(idx,obj):
+        cf = Frame(cards,bg="#fff",highlightthickness=1,highlightbackground="#e2e8f0")
+        cf.pack(fill="x",padx=20,pady=10)
+        trow = Frame(cf,bg="#fff"); trow.pack(fill="x",padx=20,pady=(18,6))
+        bg,fg = badge_colors(obj.get("course"))
+        Label(trow,text=obj.get("course") or "General",bg=bg,fg=fg,font=("Arial",10,"bold"),padx=10,pady=4).pack(side="left")
+        act = Frame(trow,bg="#fff"); act.pack(side="right")
+        ttk.Button(act,text="Edit",  width=6, command=lambda i=idx:add_note_from_notes_window(ns,i)).pack(side="left",padx=(0,6))
+        ttk.Button(act,text="Delete",width=6, command=lambda i=idx:(notes.pop(i),ns.event_generate("<<NotesUpdated>>"))).pack(side="left")
+
+        # Compute icon for attachment type
+        icon = ""
+        if obj.get("type") == "audio":
+            icon = " 🎤"
+        elif obj.get("type") == "file":
+            # Show image icon for common image extensions
+            ext = os.path.splitext(obj.get("content",""))[1].lower()
+            if ext in [".png",".jpg",".jpeg",".gif",".bmp"]:
+                icon = " 🖼️"
+            else:
+                icon = " 📁"
+        title_text = f"{obj.get('title','Untitled')}{icon}"
+        Label(cf, text=title_text, font=("Arial",16,"bold"), bg="#fff", fg="#0f172a").pack(anchor="w", padx=20)
+        Label(cf,text=obj.get("content",""),font=("Arial",11),bg="#fff",fg="#1f2937",justify="left",wraplength=620).pack(anchor="w",padx=20,pady=(4,12))
+        # Show placeholder for calendar-added (mock) notes
+        if obj.get("mock"):
+            # Placeholder for calendar-added notes
+            timestamp = f"Created {obj['day']}, DD/MM/YYYY, {obj['time']}:00"
+        else:
+            # Show updated timestamp for real/manually edited notes
+            dt = datetime.datetime.fromisoformat(obj.get("updated")) if obj.get("updated") else None
+            if dt:
+                timestamp = dt.strftime("Updated %A %d/%m/%Y, %H:%M:%S")
+            else:
+                timestamp = f"Updated {obj['day']}, {obj['date']}, {obj['time']}:00"
+        Label(cf, text=timestamp,
+              font=("Arial",10), bg="#fff", fg="#64748b").pack(anchor="w", padx=20, pady=(0,18))
+        for w in cf.winfo_children()+trow.winfo_children():
+            w.bind("<Double-Button-1>",lambda e,o=obj: open_item(o))
+
+    def refresh(_=None):
+        for w in cards.winfo_children(): w.destroy()
+        if not notes:
+            Label(cards, text="No notes yet. Click 'New Note' to get started.",
+                  font=("Arial",12),bg="#fff",fg="#64748b").pack(pady=60)
+        else:
+            # Sort notes: mock calendar notes first, then by updated timestamp desc
+            def sort_key(item):
+                idx, note = item
+                # mock notes get priority
+                priority = 1 if note.get("mock") else 0
+                return (priority, note.get("updated", ""))
+            for i,obj in sorted(enumerate(notes), key=sort_key, reverse=True):
+                render_card(i,obj)
+
+    ns.bind("<<NotesUpdated>>",refresh)
+    refresh()
+
 # -----------------------------------------
 #  FUNCTION: Flashcards & Quizzes
 # -----------------------------------------
@@ -1592,7 +1589,3 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
-
-
-
-
