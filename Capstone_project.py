@@ -1310,8 +1310,8 @@ def pomodoro_timer(selected_course=None, count_hours=True):
     global current_pomodoro_window
 
     # Set Pomodoro and break durations
-    pomodoro_time = 0.25  # Minutes
-    break_time = 0.5      # Minutes
+    pomodoro_time = 25  # Minutes
+    break_time = 5      # Minutes
 
     # Check if a timer is already running
     if current_pomodoro_window and current_pomodoro_window.winfo_exists():
@@ -1547,5 +1547,6 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
