@@ -80,7 +80,7 @@ main_frame = Frame(root_window)
 main_frame.pack(fill="both", expand=True)
 
 # ==========================
-# NOTE SYSTEM (from Program 1, adapted for menu use)
+# NOTE SYSTEM 
 # ==========================
 
 def _make_labeled(parent, widget_cls, label, **opts):
@@ -91,6 +91,7 @@ def _make_labeled(parent, widget_cls, label, **opts):
     w.pack(side="left", fill="x", expand=True, padx=(5,0))
     return w
 
+#Note system - requirement 3.2: enables adding text notes.
 def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New Note", subtitle_text=None):
     data = note.copy() if note else {}
     editor = Toplevel(parent)
@@ -123,6 +124,7 @@ def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New 
         content_txt.insert("1.0", data["content"])
     desc_frame.pack(fill="both", expand=True)
 
+#note system - requirement 3.3: enable import files 
     # Attachment buttons: audio and file
     attachment_var = StringVar(value=(data.get("content") if data.get("type") in ["file","audio"] else ""))
     attachment_type = StringVar(value=(data.get("type") if data.get("type") in ["file","audio"] else ""))
@@ -133,6 +135,7 @@ def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New 
         if path:
             attachment_var.set(path)
             attachment_type.set("file")
+#note system - bonus point 1: enable import audio 
     def browse_audio():
         path = filedialog.askopenfilename(filetypes=[("Audio Files","*.mp3 *.wav *.ogg")])
         if path:
@@ -177,6 +180,7 @@ def launch_note_editor(parent, *, note=None, courses_list=None, title_text="New 
     editor.wait_window()
     return res.get("value")
 
+#note system - bonus point 2: save note to json/csv
 def save_notes_json():
     if not notes:
         return messagebox.showwarning("No Notes","No notes to save.")
@@ -208,6 +212,7 @@ def save_notes_csv():
             writer.writerow(row)
     messagebox.showinfo("Saved", f"Notes saved to {path}")
 
+# Notes system - Requirement 3.1: binds with a session, course, or day.
 def add_note_from_cell(row,col):
     vals = launch_note_editor(root_window, courses_list=list(courses.keys()),
                               title_text="New Note",
@@ -1587,6 +1592,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
