@@ -417,8 +417,7 @@ def show_instructions():
     header = Label(main_frame, text="Welcome to the Study Planner!", font=("Arial", 14, "bold"))
     header.pack(pady=5)
 
-    instructions_text = """ This application helps you plan weekly study sessions, manage courses, track total hours, write notes, 
-use flashcards for learning, and manage your focus with the Pomodoro timer.
+    instructions_text = """ This application helps you plan weekly study sessions, manage courses, track total hours, write notes, use flashcards for learning, and manage your focus with the Pomodoro timer.
 
 ==============================
 STUDY PLANNER
@@ -644,7 +643,6 @@ def edit_or_delete_study_session(row=None, col=None):
     Label(popup, text="Select what you want to do:").pack(pady=10)
     Button(popup, text="Edit", width=15, command=lambda: set_choice("edit")).pack(pady=3)
     Button(popup, text="Delete", width=15, command=lambda: set_choice("delete")).pack(pady=3)
-    Button(popup, text="Add Note", width=15, command=lambda: set_choice("note")).pack(pady=3)
 
     popup.wait_window()
     if choice["value"] == "note" and row and col:
@@ -1278,8 +1276,8 @@ def pomodoro_timer(selected_course=None, count_hours=True):
     """
 
     # Set Pomodoro and break durations
-    pomodoro_time = 25  # Minutes
-    break_time = 5      # Minutes
+    pomodoro_time = 0.25  # Minutes
+    break_time = 0.5      # Minutes
 
     # Ask user to select a course if none is provided
     if not selected_course:
@@ -1310,31 +1308,32 @@ def pomodoro_timer(selected_course=None, count_hours=True):
         if not selected_course:
             return  # User cancelled selection
 
-    # Clear main window
-    for widget in main_frame.winfo_children():
-        widget.destroy()
+    # 🟢 Create a new popup window for the timer
+    pomodoro_window = Toplevel(root_window)
+    pomodoro_window.title("Pomodoro Timer")
+    pomodoro_window.geometry("350x450")
+
+    # Use a new frame inside the popup instead of the main window
+    pomodoro_frame = Frame(pomodoro_window)
+    pomodoro_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
     # Headers
-    Label(main_frame, text="Pomodoro Timer", font=("Arial", 14, "bold")).pack(pady=10)
-    Label(main_frame, text=f"Course: {selected_course}", font=("Arial", 12)).pack(pady=5)
+    Label(pomodoro_frame, text="Pomodoro Timer", font=("Arial", 14, "bold")).pack(pady=10)
+    Label(pomodoro_frame, text=f"Course: {selected_course}", font=("Arial", 12)).pack(pady=5)
 
-    # Create a canvas to visualize timer progress
+    # Canvas
     canvas_size = 200
-    timer_canvas = Canvas(main_frame, width=canvas_size, height=canvas_size, highlightthickness=0)
+    timer_canvas = Canvas(pomodoro_frame, width=canvas_size, height=canvas_size, highlightthickness=0)
     timer_canvas.pack(pady=20)
 
-    # Background circle
     circle_bg = timer_canvas.create_oval(10, 10, canvas_size - 10, canvas_size - 10, outline="white", width=20)
-    # Foreground arc that fills as time passes
     circle_fg = timer_canvas.create_arc(10, 10, canvas_size - 10, canvas_size - 10,
-                                        start=90, extent=0, style="arc",
-                                        outline="green", width=20)
-    # Text inside circle showing countdown
+                                            start=90, extent=0, style="arc",
+                                            outline="green", width=20)
     timer_text = timer_canvas.create_text(canvas_size / 2, canvas_size / 2,
-                                          text=f"{pomodoro_time:02}:00", font=("Arial", 24, "bold"))
+                                              text=f"{pomodoro_time:02}:00", font=("Arial", 24, "bold"))
 
-    # Status label
-    status_label = Label(main_frame, text="Status: Ready to start", font=("Arial", 12))
+    status_label = Label(pomodoro_frame, text="Status: Ready to start", font=("Arial", 12))
     status_label.pack(pady=10)
 
     # Internal state variables
@@ -1359,7 +1358,7 @@ def pomodoro_timer(selected_course=None, count_hours=True):
             timer_canvas.itemconfig(timer_text, text=format_time(remaining_seconds["value"]))
             timer_canvas.itemconfig(circle_fg, extent=progress, outline=color)
             # Call this function again after 1 second
-            main_frame.after(1000, update_timer)
+            pomodoro_frame.after(1000, update_timer)
         elif remaining_seconds["value"] == 0:
             # Time is up
             is_running["value"] = False
@@ -1370,24 +1369,24 @@ def pomodoro_timer(selected_course=None, count_hours=True):
                 if count_hours and selected_course != "General":
                     add_time = messagebox.askyesno(
                         "Pomodoro Finished",
-                        f"Study session finished!\nDo you want to add 0.5 hour to '{selected_course}'?"
+                        f"Study session finished!\nDo you want to add 0.5 hour to '{selected_course}'?", parent=pomodoro_window
                     )
                     if add_time:
                         tracked_hours[selected_course] = tracked_hours.get(selected_course, 0) + 0.5
                 else:
-                    messagebox.showinfo("Pomodoro", f"Study session for '{selected_course}' finished.")
+                    messagebox.showinfo("Pomodoro", f"Study session for '{selected_course}' finished.", parent=pomodoro_window)
 
                 # Start break
                 is_study_time["value"] = False
                 remaining_seconds["value"] = break_time * 60
                 status_label.config(text="Status: Break time")
                 update_timer()
-                messagebox.showinfo("Break", "Break started!")
+                messagebox.showinfo("Break", "Break started!", parent=pomodoro_window)
 
             else:
                 try: winsound.Beep(600, 1600)
                 except: pass
-                messagebox.showinfo("Pomodoro", "Break is over! Back to studying.")
+                messagebox.showinfo("Pomodoro", "Break is over! Back to studying.", parent=pomodoro_window)
                 is_study_time["value"] = True
                 remaining_seconds["value"] = pomodoro_time * 60
                 status_label.config(text="Status: Study time")
@@ -1412,14 +1411,11 @@ def pomodoro_timer(selected_course=None, count_hours=True):
         timer_canvas.itemconfig(circle_fg, extent=0, outline="green")
 
     # Display buttons
-    button_frame = Frame(main_frame)
+    button_frame = Frame(pomodoro_frame)
     button_frame.pack(pady=10)
     Button(button_frame, text="Start", width=10, command=start_timer).grid(row=0, column=0, padx=5)
     Button(button_frame, text="Stop", width=10, command=stop_timer).grid(row=0, column=1, padx=5)
     Button(button_frame, text="Reset", width=10, command=reset_timer).grid(row=0, column=2, padx=5)
-
-
-
 
 # -----------------------------------------
 #  FUNCTION: Bind timer and schedule
@@ -1490,6 +1486,7 @@ def setup_menu():
 setup_menu()
 show_instructions()  # Show instructions directly in the main window at startup
 root_window.mainloop()
+
 
 
 
